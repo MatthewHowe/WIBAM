@@ -55,7 +55,7 @@ class opts(object):
                              help='disable progress bar and print to screen.')
     self.parser.add_argument('--save_all', action='store_true',
                              help='save model to disk every 5 epochs.')
-    self.parser.add_argument('--vis_thresh', type=float, default=0.3,
+    self.parser.add_argument('--vis_thresh', type=float, default=0.05,
                              help='visualization threshold.')
     self.parser.add_argument('--debugger_theme', default='white', 
                              choices=['white', 'black'])
