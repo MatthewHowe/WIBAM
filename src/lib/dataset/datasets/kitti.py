@@ -91,12 +91,13 @@ class KITTI(GenericDataset):
   def run_eval(self, results, save_dir):
     # import pdb; pdb.set_trace()
     self.save_results(results, save_dir)
+    print("\n\n")
+    print(os.system('ls'))
     print('Results of IoU threshold 0.7')
-    os.system('./tools/kitti_eval/evaluate_object_3d_offline_07 ' + \
-              '../data/kitti/training/label_val ' + \
-              '{}/results_kitti/'.format(save_dir))
+    os.system('src/tools/kitti_eval/evaluate_object_3d_offline_07 ' + \
+              'data/kitti/training/label_2/  ' + \
+              '{}/results_kitti'.format(save_dir))
     print('Results of IoU threshold 0.5')
-    os.system('./tools/kitti_eval/evaluate_object_3d_offline ' + \
-              '../data/kitti/training/label_val ' + \
-              '{}/results_kitti/'.format(save_dir))
-    
+    os.system('src/tools/kitti_eval/evaluate_object_3d_offline ' + \
+              'data/kitti/training/label_2/ ' + \
+              '{}/results_kitti'.format(save_dir))
