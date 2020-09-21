@@ -120,6 +120,8 @@ def prefetch_test(opt):
         print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix))
     else:
       bar.next()
+
+
   bar.finish()
   if opt.save_results:
     print('saving results to', opt.save_dir + '/save_results_{}{}.json'.format(

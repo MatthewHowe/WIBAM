@@ -80,7 +80,6 @@ class KITTI(GenericDataset):
         f.write(' {:.2f}'.format(item['alpha']))
         f.write(' {:.2f} {:.2f} {:.2f} {:.2f}'.format(
           item['bbox'][0], item['bbox'][1], item['bbox'][2], item['bbox'][3]))
-        
         f.write(' {:.2f} {:.2f} {:.2f}'.format(
           item['dim'][0], item['dim'][1], item['dim'][2]))
         f.write(' {:.2f} {:.2f} {:.2f}'.format(
