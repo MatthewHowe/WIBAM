@@ -7,12 +7,15 @@ import os
 
 import torch
 import torch.utils.data
+from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
 from model.data_parallel import DataParallel
 from logger import Logger
 from dataset.dataset_factory import get_dataset
 from trainer import Trainer
+
+writer = SummaryWriter(opts.output_path)
 
 def get_optimizer(opt, model):
   if opt.optim == 'adam':
@@ -44,7 +47,7 @@ def main(opt):
     model, optimizer, start_epoch = load_model(
       model, opt.load_model, opt, optimizer)
 
-  trainer = Trainer(opt, model, optimizer)
+  trainer = Trainer(opt, model, writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
   
   if opt.val_intervals < opt.num_epochs or opt.test:
@@ -72,6 +75,7 @@ def main(opt):
     for k, v in log_dict_train.items():
       logger.scalar_summary('train_{}'.format(k), v, epoch)
       logger.write('{} {:8f} | '.format(k, v))
+      writer.add_scalar("".format(k), v, epoch)
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
                  epoch, model, optimizer)

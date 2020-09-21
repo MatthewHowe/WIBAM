@@ -254,6 +254,9 @@ class opts(object):
     self.parser.add_argument('--custom_dataset_img_path', default='')
     self.parser.add_argument('--custom_dataset_ann_path', default='')
 
+    # Save directory
+    self.parser.add_argument("--output_path", default=os.path.join(opt.root_dir, 'exp', opt.task))
+
   def parse(self, args=''):
     if args == '':
       opt = self.parser.parse_args()
