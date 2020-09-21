@@ -15,8 +15,6 @@ from logger import Logger
 from dataset.dataset_factory import get_dataset
 from trainer import Trainer
 
-writer = SummaryWriter(opts.output_path)
-
 def get_optimizer(opt, model):
   if opt.optim == 'adam':
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
@@ -47,9 +45,11 @@ def main(opt):
     model, optimizer, start_epoch = load_model(
       model, opt.load_model, opt, optimizer)
 
+  writer = SummaryWriter(opt.output_path)
+
   trainer = Trainer(opt, model, writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
-  
+
   if opt.val_intervals < opt.num_epochs or opt.test:
     print('Setting up validation data...')
     val_loader = torch.utils.data.DataLoader(
