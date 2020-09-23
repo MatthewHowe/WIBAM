@@ -13,7 +13,16 @@ import torch.utils.model_zoo as model_zoo
 from .base_model import BaseModel
 import numpy as np
 
-BatchNorm = nn.BatchNorm2d
+def __init__(norm):
+def group_norm(out_channels):
+    num_groups = cfg.MODEL.GROUP_NORM.NUM_GROUPS
+    if out_channels % 32 == 0:
+        return nn.GroupNorm(num_groups, out_channels)
+    else:
+        return nn.GroupNorm(num_groups // 2, out_channels)
+
+Norm_func = nn.BatchNorm2d
+# Norm_func = group_norm
 
 def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
     return join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
@@ -31,12 +40,12 @@ class BasicBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3,
                                stride=stride, padding=dilation,
                                bias=False, dilation=dilation)
-        self.bn1 = BatchNorm(planes)
+        self.bn1 = Norm_func(planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
                                stride=1, padding=dilation,
                                bias=False, dilation=dilation)
-        self.bn2 = BatchNorm(planes)
+        self.bn2 = Norm_func(planes)
         self.stride = stride
 
     def forward(self, x, residual=None):
@@ -65,14 +74,14 @@ class Bottleneck(nn.Module):
         bottle_planes = planes // expansion
         self.conv1 = nn.Conv2d(inplanes, bottle_planes,
                                kernel_size=1, bias=False)
-        self.bn1 = BatchNorm(bottle_planes)
+        self.bn1 = Norm_func(bottle_planes)
         self.conv2 = nn.Conv2d(bottle_planes, bottle_planes, kernel_size=3,
                                stride=stride, padding=dilation,
                                bias=False, dilation=dilation)
-        self.bn2 = BatchNorm(bottle_planes)
+        self.bn2 = Norm_func(bottle_planes)
         self.conv3 = nn.Conv2d(bottle_planes, planes,
                                kernel_size=1, bias=False)
-        self.bn3 = BatchNorm(planes)
+        self.bn3 = Norm_func(planes)
         self.relu = nn.ReLU(inplace=True)
         self.stride = stride
 
@@ -109,14 +118,14 @@ class BottleneckX(nn.Module):
         bottle_planes = planes * cardinality // 32
         self.conv1 = nn.Conv2d(inplanes, bottle_planes,
                                kernel_size=1, bias=False)
-        self.bn1 = BatchNorm(bottle_planes)
+        self.bn1 = Norm_func(bottle_planes)
         self.conv2 = nn.Conv2d(bottle_planes, bottle_planes, kernel_size=3,
                                stride=stride, padding=dilation, bias=False,
                                dilation=dilation, groups=cardinality)
-        self.bn2 = BatchNorm(bottle_planes)
+        self.bn2 = Norm_func(bottle_planes)
         self.conv3 = nn.Conv2d(bottle_planes, planes,
                                kernel_size=1, bias=False)
-        self.bn3 = BatchNorm(planes)
+        self.bn3 = Norm_func(planes)
         self.relu = nn.ReLU(inplace=True)
         self.stride = stride
 
@@ -147,7 +156,7 @@ class Root(nn.Module):
         self.conv = nn.Conv2d(
             in_channels, out_channels, 1,
             stride=1, bias=False, padding=(kernel_size - 1) // 2)
-        self.bn = BatchNorm(out_channels)
+        self.bn = Norm_func(out_channels)
         self.relu = nn.ReLU(inplace=True)
         self.residual = residual
 
@@ -199,7 +208,7 @@ class Tree(nn.Module):
             self.project = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels,
                           kernel_size=1, stride=1, bias=False),
-                BatchNorm(out_channels)
+                Norm_func(out_channels)
             )
 
     def forward(self, x, residual=None, children=None):
@@ -229,7 +238,7 @@ class DLA(nn.Module):
         self.base_layer = nn.Sequential(
             nn.Conv2d(3, channels[0], kernel_size=7, stride=1,
                       padding=3, bias=False),
-            BatchNorm(channels[0]),
+            Norm_func(channels[0]),
             nn.ReLU(inplace=True))
         self.level0 = self._make_conv_level(
             channels[0], channels[0], levels[0])
@@ -248,20 +257,20 @@ class DLA(nn.Module):
             self.pre_img_layer = nn.Sequential(
             nn.Conv2d(3, channels[0], kernel_size=7, stride=1,
                       padding=3, bias=False),
-            BatchNorm(channels[0]),
+            Norm_func(channels[0]),
             nn.ReLU(inplace=True))
         if opt.pre_hm:
             self.pre_hm_layer = nn.Sequential(
             nn.Conv2d(1, channels[0], kernel_size=7, stride=1,
                     padding=3, bias=False),
-            BatchNorm(channels[0]),
+            Norm_func(channels[0]),
             nn.ReLU(inplace=True))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, BatchNorm):
+            elif isinstance(m, Norm_func):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
@@ -272,7 +281,7 @@ class DLA(nn.Module):
                 nn.MaxPool2d(stride, stride=stride),
                 nn.Conv2d(inplanes, planes,
                           kernel_size=1, stride=1, bias=False),
-                BatchNorm(planes),
+                Norm_func(planes),
             )
 
         layers = []
@@ -289,7 +298,7 @@ class DLA(nn.Module):
                 nn.Conv2d(inplanes, planes, kernel_size=3,
                           stride=stride if i == 0 else 1,
                           padding=dilation, bias=False, dilation=dilation),
-                BatchNorm(planes),
+                Norm_func(planes),
                 nn.ReLU(inplace=True)])
             inplanes = planes
         return nn.Sequential(*modules)
@@ -412,9 +421,9 @@ def dla169(pretrained=None, **kwargs):  # DLA-169
 
 
 def set_bn(bn):
-    global BatchNorm
-    BatchNorm = bn
-    dla.BatchNorm = bn
+    global Norm_func
+    Norm_func = bn
+    dla.Norm_func = bn
 
 
 class Identity(nn.Module):
@@ -449,7 +458,7 @@ class IDAUp(nn.Module):
                 proj = nn.Sequential(
                     nn.Conv2d(c, out_dim,
                               kernel_size=1, stride=1, bias=False),
-                    BatchNorm(out_dim),
+                    Norm_func(out_dim),
                     nn.ReLU(inplace=True))
             f = int(up_factors[i])
             if f == 1:
@@ -467,7 +476,7 @@ class IDAUp(nn.Module):
                 nn.Conv2d(out_dim * 2, out_dim,
                           kernel_size=node_kernel, stride=1,
                           padding=node_kernel // 2, bias=False),
-                BatchNorm(out_dim),
+                Norm_func(out_dim),
                 nn.ReLU(inplace=True))
             setattr(self, 'node_' + str(i), node)
 
@@ -475,7 +484,7 @@ class IDAUp(nn.Module):
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, BatchNorm):
+            elif isinstance(m, Norm_func):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 

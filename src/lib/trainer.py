@@ -170,12 +170,14 @@ class Trainer(object):
       Bar.suffix = '{phase}: [{0}][{1}/{2}]|Tot: {total:} |ETA: {eta:} '.format(
         epoch, iter_id, num_iters, phase=phase,
         total=bar.elapsed_td, eta=bar.eta_td)
+
+      # Logging step
       for l in avg_loss_stats:
         avg_loss_stats[l].update(
           loss_stats[l].mean().item(), batch['image'].size(0)
         )
         Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
-        self.writer.add_scalar("{}".format(l), avg_loss_stats[l].avg, self.total_steps)
+        self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps)
 
       Bar.suffix = Bar.suffix + '|Data {dt.val:.3f}s({dt.avg:.3f}s) ' \
         '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)

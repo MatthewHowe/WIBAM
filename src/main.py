@@ -7,6 +7,7 @@ import os
 
 import torch
 import torch.utils.data
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
@@ -39,6 +40,7 @@ def main(opt):
 
   print('Creating model...')
   model = create_model(opt.arch, opt.heads, opt.head_conv, opt=opt)
+
   optimizer = get_optimizer(opt, model)
   start_epoch = 0
   if opt.load_model != '':
