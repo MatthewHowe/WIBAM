@@ -91,7 +91,7 @@ class ModleWithLoss(torch.nn.Module):
     super(ModleWithLoss, self).__init__()
     self.model = model
     self.loss = loss
-  
+
   def forward(self, batch):
     pre_img = batch['pre_img'] if 'pre_img' in batch else None
     pre_hm = batch['pre_hm'] if 'pre_hm' in batch else None
@@ -143,14 +143,20 @@ class Trainer(object):
 
     # Training loop
     for iter_id, batch in enumerate(data_loader):
+      #  Break if epoch complete
       if iter_id >= num_iters:
         break
+
       data_time.update(time.time() - end)
 
+      # Put batches to GPU
       for k in batch:
         if k != 'meta':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
+
+      # Run model with batch
       output, loss, loss_stats = model_with_loss(batch)
+
       loss = loss.mean()
 
 
