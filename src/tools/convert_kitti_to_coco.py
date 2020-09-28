@@ -92,7 +92,7 @@ for SPLIT in SPLITS:
       # if split == 'val':
       #   os.system('cp {} {}/'.format(ann_path, VAL_PATH))
       anns = open(ann_path, 'r')
-      
+
       if DEBUG:
         image = cv2.imread(
           DATA_PATH + 'images/trainval/' + image_info['file_name'])
@@ -149,4 +149,3 @@ for SPLIT in SPLITS:
     # import pdb; pdb.set_trace()
     out_path = '{}annotations/kitti_{}_{}.json'.format(DATA_PATH, SPLIT, split)
     json.dump(ret, open(out_path, 'w'))
-  

@@ -13,7 +13,6 @@ import torch.utils.model_zoo as model_zoo
 from .base_model import BaseModel
 import numpy as np
 
-def __init__(norm):
 def group_norm(out_channels):
     num_groups = cfg.MODEL.GROUP_NORM.NUM_GROUPS
     if out_channels % 32 == 0:
@@ -21,6 +20,7 @@ def group_norm(out_channels):
     else:
         return nn.GroupNorm(num_groups // 2, out_channels)
 
+# Pick a normalisation function
 Norm_func = nn.BatchNorm2d
 # Norm_func = group_norm
 

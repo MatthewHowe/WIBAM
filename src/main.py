@@ -30,28 +30,41 @@ def get_optimizer(opt, model):
 def main(opt):
   torch.manual_seed(opt.seed)
   torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
+
+  # Initialise dataset
   Dataset = get_dataset(opt.dataset)
+
+  # Initialise training task
   opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
   print(opt)
+
+  #
   if not opt.not_set_cuda_env:
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
   opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
-  logger = Logger(opt)
 
+  # Initialise loggers
+  logger = Logger(opt)
+  writer = SummaryWriter(opt.output_path)
+
+  # Create model
   print('Creating model...')
   model = create_model(opt.arch, opt.heads, opt.head_conv, opt=opt)
 
+  # Initialise optimiser
   optimizer = get_optimizer(opt, model)
   start_epoch = 0
+
+  # Load model from options
   if opt.load_model != '':
     model, optimizer, start_epoch = load_model(
       model, opt.load_model, opt, optimizer)
 
-  writer = SummaryWriter(opt.output_path)
-
+  # Initialise trainer class
   trainer = Trainer(opt, model, writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
 
+  # If validation during traininer or running test initialise
   if opt.val_intervals < opt.num_epochs or opt.test:
     print('Setting up validation data...')
     val_loader = torch.utils.data.DataLoader(
@@ -77,7 +90,6 @@ def main(opt):
     for k, v in log_dict_train.items():
       logger.scalar_summary('train_{}'.format(k), v, epoch)
       logger.write('{} {:8f} | '.format(k, v))
-      writer.add_scalar("".format(k), v, epoch)
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
                  epoch, model, optimizer)

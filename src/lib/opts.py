@@ -327,7 +327,7 @@ class opts(object):
       opt.exp_dir = os.path.join(opt.output_path, 'exp', opt.task)
     opt.save_dir = os.path.join(opt.exp_dir, opt.exp_id)
     opt.debug_dir = os.path.join(opt.save_dir, 'debug')
-    
+
     if opt.resume and opt.load_model == '':
       opt.load_model = os.path.join(opt.save_dir, 'model_last.pth')
     return opt
@@ -346,7 +346,7 @@ class opts(object):
     opt.output_w = opt.input_w // opt.down_ratio
     opt.input_res = max(opt.input_h, opt.input_w)
     opt.output_res = max(opt.output_h, opt.output_w)
-  
+
     opt.heads = {'hm': opt.num_classes, 'reg': 2, 'wh': 2}
 
     if 'tracking' in opt.task:
@@ -354,7 +354,7 @@ class opts(object):
 
     if 'ddd' in opt.task:
       opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3, 'amodel_offset': 2})
-    
+
     if 'multi_pose' in opt.task:
       opt.heads.update({
         'hps': dataset.num_joints * 2, 'hm_hp': dataset.num_joints,
@@ -386,7 +386,7 @@ class opts(object):
         del opt.heads[head]
     opt.head_conv = {head: [opt.head_conv \
       for i in range(opt.num_head_conv if head != 'reg' else 1)] for head in opt.heads}
-    
+
     print('input h w:', opt.input_h, opt.input_w)
     print('heads', opt.heads)
     print('weights', opt.weights)

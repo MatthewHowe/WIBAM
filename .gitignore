@@ -12,6 +12,8 @@ src/lib/models/networks/DCNv2_10
 src/lib/model/networks/DCNv2_04
 src/lib/model/networks/DCNv2_10
 # src/tools/kitti_eval
+
+runs/*
 .idea/
 legacy/*
 models/*
@@ -27,6 +29,7 @@ exp/*
 models/*
 model/*
 images/
+images/*
 src/.vscode/*
 src/paths.py
 preds/*

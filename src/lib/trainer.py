@@ -39,19 +39,22 @@ class GenericLoss(torch.nn.Module):
 
   def forward(self, outputs, batch):
     opt = self.opt
+    # reset all losses to zero
     losses = {head: 0 for head in opt.heads}
 
+    # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
       output = outputs[s]
       output = self._sigmoid_output(output)
 
+      # Heatmap loss
       if 'hm' in output:
         losses['hm'] += self.crit(
-          output['hm'], batch['hm'], batch['ind'], 
+          output['hm'], batch['hm'], batch['ind'],
           batch['mask'], batch['cat']) / opt.num_stacks
-      
+
       regression_heads = [
-        'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps', 
+        'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps',
         'dep', 'dim', 'amodel_offset', 'velocity']
 
       for head in regression_heads:
@@ -59,16 +62,16 @@ class GenericLoss(torch.nn.Module):
           losses[head] += self.crit_reg(
             output[head], batch[head + '_mask'],
             batch['ind'], batch[head]) / opt.num_stacks
-      
+
       if 'hm_hp' in output:
         losses['hm_hp'] += self.crit(
-          output['hm_hp'], batch['hm_hp'], batch['hp_ind'], 
+          output['hm_hp'], batch['hm_hp'], batch['hp_ind'],
           batch['hm_hp_mask'], batch['joint']) / opt.num_stacks
         if 'hp_offset' in output:
           losses['hp_offset'] += self.crit_reg(
             output['hp_offset'], batch['hp_offset_mask'],
             batch['hp_ind'], batch['hp_offset']) / opt.num_stacks
-        
+
       if 'rot' in output:
         losses['rot'] += self.crit_rot(
           output['rot'], batch['rot_mask'], batch['ind'], batch['rotbin'],
@@ -82,9 +85,12 @@ class GenericLoss(torch.nn.Module):
     losses['tot'] = 0
     for head in opt.heads:
       losses['tot'] += opt.weights[head] * losses[head]
-    
+
     return losses['tot'], losses
 
+class MultiviewLoss(torch.nn.Module):
+  def __init__(self, opt):
+    print("[ERROR] Not implemented")
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
@@ -107,16 +113,17 @@ class Trainer(object):
     self.loss_stats, self.loss = self._get_losses(opt)
     self.model_with_loss = ModleWithLoss(model, self.loss)
     self.writer = writer
-    self.total_steps = 0
+    self.total_steps_train = 0
+    self.total_steps_val = 0
 
   def set_device(self, gpus, chunk_sizes, device):
     if len(gpus) > 1:
       self.model_with_loss = DataParallel(
-        self.model_with_loss, device_ids=gpus, 
+        self.model_with_loss, device_ids=gpus,
         chunk_sizes=chunk_sizes).to(device)
     else:
       self.model_with_loss = self.model_with_loss.to(device)
-    
+
     for state in self.optimizer.state.values():
       for k, v in state.items():
         if isinstance(v, torch.Tensor):
@@ -154,12 +161,14 @@ class Trainer(object):
         if k != 'meta':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
-      # Run model with batch
+      # Run outputs for batch from model with losses
+      # Loss is the total loss for the batch
       output, loss, loss_stats = model_with_loss(batch)
 
+      # Change backprop method from add to mean
       loss = loss.mean()
 
-
+      # If training phase, back propogate the loss
       if phase == 'train':
         self.optimizer.zero_grad()
         loss.backward()
@@ -177,8 +186,15 @@ class Trainer(object):
           loss_stats[l].mean().item(), batch['image'].size(0)
         )
         Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
-        self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps)
 
+        # Tensorboard log
+        if l == "amodel_offset":
+          continue
+        else:
+          if phase == "train":
+            self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_train)
+          elif phase == "val":
+            self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_val)
       Bar.suffix = Bar.suffix + '|Data {dt.val:.3f}s({dt.avg:.3f}s) ' \
         '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar
@@ -186,14 +202,20 @@ class Trainer(object):
           print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix)) 
       else:
         bar.next()
-      
+
+      #
       if opt.debug > 0:
         self.debug(batch, output, iter_id, dataset=data_loader.dataset)
-      
-      self.total_steps += 1
+
+      # Iterate step
+      if phase == "train":
+        self.total_steps_train += 1
+      elif phase == "val":
+        self.total_steps_val += 1
 
       del output, loss, loss_stats
-    
+
+    #
     bar.finish()
     ret = {k: v.avg for k, v in avg_loss_stats.items()}
     ret['time'] = bar.elapsed_td.total_seconds() / 60.

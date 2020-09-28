@@ -50,13 +50,16 @@ class GenericDataset(data.Dataset):
   ignore_val = 1
   nuscenes_att_range = {0: [0, 1], 1: [0, 1], 2: [2, 3, 4], 3: [2, 3, 4], 
     4: [2, 3, 4], 5: [5, 6, 7], 6: [5, 6, 7], 7: [5, 6, 7]}
-  def __init__(self, opt=None, split=None, ann_path=None, img_dir=None):
+  def __init__(self, opt=None, split=None, ann_path=None, img_dir=None, multi_cam=None):
     super(GenericDataset, self).__init__()
     if opt is not None and split is not None:
       self.split = split
       self.opt = opt
       self._data_rng = np.random.RandomState(123)
-    
+
+    if multi_cam is not None:
+      self.multi_cam = multi_cam
+
     if ann_path is not None and img_dir is not None:
       print('==> initializing {} data from {}, \n images from {} ...'.format(
         split, ann_path, img_dir))
@@ -70,7 +73,7 @@ class GenericDataset(data.Dataset):
         self.video_to_images = defaultdict(list)
         for image in self.coco.dataset['images']:
           self.video_to_images[image['video_id']].append(image)
-      
+
       self.img_dir = img_dir
 
   def __getitem__(self, index):
@@ -107,7 +110,7 @@ class GenericDataset(data.Dataset):
         pre_image = pre_image[:, ::-1, :].copy()
         pre_anns = self._flip_anns(pre_anns, width)
       if opt.same_aug_pre and frame_dist != 0:
-        trans_input_pre = trans_input 
+        trans_input_pre = trans_input
         trans_output_pre = trans_output
       else:
         c_pre, aug_s_pre, _ = self._get_aug_param(
@@ -276,7 +279,7 @@ class GenericDataset(data.Dataset):
       c[0] += s * np.clip(np.random.randn()*cf, -2*cf, 2*cf)
       c[1] += s * np.clip(np.random.randn()*cf, -2*cf, 2*cf)
       aug_s = np.clip(np.random.randn()*sf + 1, 1 - sf, 1 + sf)
-    
+
     if np.random.random() < self.opt.aug_rot:
       rf = self.opt.rotate
       rot = np.clip(np.random.randn()*rf, -rf*2, rf*2)
@@ -447,6 +450,9 @@ class GenericDataset(data.Dataset):
     gt_det['scores'].append(1)
     gt_det['clses'].append(cls_id - 1)
     gt_det['cts'].append(ct)
+
+    # TODO: Add in multi-view data initilisation
+
 
     if 'tracking' in self.opt.heads:
       if ann['track_id'] in track_ids:
