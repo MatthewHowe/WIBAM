@@ -195,7 +195,7 @@ class GenericDataset(data.Dataset):
     img = cv2.imread(img_path)
     return img, anns, img_info, img_path
 
-  # Load data
+  # Load data, uses index to find img_id
   def _load_data(self, index):
     coco = self.coco
     img_dir = self.img_dir

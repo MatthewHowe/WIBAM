@@ -25,11 +25,19 @@ class WIBAM(GenericDataset):
   cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
   max_objs = 50
   def __init__(self, opt, split):
+    # Define specific locations of dataset files
     data_dir = os.path.join(opt.data_dir, 'wibam')
     img_dir = os.path.join(data_dir, 'frames')
+    # Where instance sets are kept
+    split_dir = os.path.join(data_dir, 'image_sets')
+    
+    # Count the number of lines in the image set, which indicates time instances
+    with open(os.path.join(split_dir, 'wibam_{}.txt'.format(split))) as img_split:
+      self.instances =  sum(1 for _ in image_set)
 
+    # Get annotation path
     ann_path = os.path.join(data_dir,
-    'annotations', 'wibam_{}.json').format(split)
+      'annotations', 'wibam_{}.json').format(split)
 
     self.images = None
     # load image list and coco
@@ -37,12 +45,17 @@ class WIBAM(GenericDataset):
 
     # Dataset can be loaded as either single images or all camera
     # images at an instance
-    if self.opt.instance_batching:
-      self.num_samples = len(self.images)
-    else:
+    if self.opt.instance_batching: 
+      self.instance_batching = True
       self.num_samples = len(self.instances)
+    else:
+      self.instance_batching = False
+      self.num_samples = len(self.images)
 
-    print('Loaded {} split with {} samples'.format(split, self.num_samples))
+    print('[INFO] Loaded {} split with {} images and {} instances'.format( \
+          split, self.images, self.instances))
+    print("[INFO] Loading with instance_batching: {} in {} samples".format( \
+          self.opt.instance_batching, self.num_samples))
 
   # Override functions
   # Called to load image and annotations, option to do all instances at time
@@ -51,6 +64,7 @@ class WIBAM(GenericDataset):
     opt = self.opt
 
     # Load information from annotations file including image
+    # TODO: Check this
     if self.opt.instance_batching:
       img, anns, img_info, img_path = self._load_data_instance_batch(index)
     else:
@@ -262,14 +276,14 @@ class WIBAM(GenericDataset):
         gt_det['amodel_offset'].append([0, 0])
 
   # Loads image annotations from file
-  def _load_image_anns():
+  def _load_image_anns(self, img_id, coco, img_dir, instance=False):
     img_info = coco.loadImgs(ids=[img_id])[0]
     file_name = img_info['file_name']
     img_path = os.path.join(img_dir, file_name)
     ann_ids = coco.getAnnIds(imgIds=[img_id])
     anns = copy.deepcopy(coco.loadAnns(ids=ann_ids))
     img = cv2.imread(img_path)
-    return img, anns, img_info, img_path
+    return img, anns, img_info, img_path, instance
 
   # Loads calibration information
   def _get_calib():
@@ -280,11 +294,26 @@ class WIBAM(GenericDataset):
                         [0, self.rest_focal_length, height / 2, 0], 
                         [0, 0, 1, 0]])
     return calib
-  
+
+  # Loading data, use dataloader index to get image id
+  # Function for loading single image with all annotations
+  def _load_data():
+    img_id = self.images[index]
+    img, anns, img_info, img_path, instance = self._load_image_anns(img_id, self.coco, self.img_dir)
+
+    return img, anns, img_info, img_path
+
+  # Function for loading all images at an instance
+  def _load_data_instance_batch():
+    instance_id = self.instances[index]
+    imgs, anns, imgs_info, imgs_path = self._load_image_anns(instance_id, self.coco, self.img_dir, instance=True)
+
+
   # May need to rewrite flip annotations due to other camera annotations being wrong
   # TODO: Workout how it affects the system and calibrations, probably set all augmentation off initially
   def flip_anns():
 
+  # Dataloader uses this function to create the iterable dataset
   def __len__(self):
     return self.num_samples
 
