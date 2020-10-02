@@ -434,7 +434,7 @@ class GenericDataset(data.Dataset):
                     dtype=np.float32)
     return bbox
 
-  #
+  # Converts bounding box and transforms it if augmentation has occured
   def _get_bbox_output(self, bbox, trans_output, height, width):
     bbox = self._coco_box_to_bbox(bbox).copy()
 

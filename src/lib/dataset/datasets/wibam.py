@@ -64,108 +64,132 @@ class WIBAM(GenericDataset):
     opt = self.opt
 
     # Load information from annotations file including image
-    # TODO: Check this
-    if self.opt.instance_batching:
-      img, anns, img_info, img_path = self._load_data_instance_batch(index)
-    else:
-      img, anns, img_info, img_path = self._load_data(index)
+    # output is a list of outputs for each image at instances
+    # in the case of instance_batching, else just a list of one
+    # image and annotaitons
+    imgs, imgs_anns, imgs_info, imgs_path = self._load_data(index)
 
-    # Get image size
-    height, width = img.shape[0], img.shape[1]
+    ###############
+    # All data augmentation code was here - removed
+    ###############
 
-    # Get the centre location of the image
-    c = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
+    rets = []
 
-    # Get the max size fo the image and convert to float unless dataset has imbalanced aspect ratio
-    # then use
-    s = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
-      else np.array([img.shape[1], img.shape[0]], np.float32)
+    for i in range(len(imgs))
+      # initialise return variable
+      ret = {'image': imgs[i]}
+      # initialise gt dictionary
+      gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
 
-    #Initialise parameter for when validation is being performed (no augmentation)
-    aug_s, rot, flipped = 1, 0, 0
+      ### init samples
+      self._init_ret(ret, gt_det)
 
-    # If training split perform flip augmentation
-    if self.split == 'train':
-      # Override parameters if autmnetation being done
-      c, aug_s, rot = self._get_aug_param(c, s, width, height)
+      # Get calibration information from image info
+      # Dictionary of all calibraiton information
+      calib = self._get_calib(imgs_info[i])
 
-      # New max size of image
-      s = s * aug_s
+      # Number of objects minimum of detections or max objects
+      num_objs = min(len(anns), self.max_objs)
 
-      # Determin whether to flip or not
-      if np.random.random() < opt.flip:
-        # If random variable greater than flip we flip the image and set indicator
-        flipped = 1
-        img = img[:, ::-1, :]
-        # Need to flip the annotations also
-        anns = self._flip_anns(anns, width)
+      # For all objects
+      for k in range(num_objs):
+        # Get indexed annotation
+        ann = imgs_anns[i][k]
 
-    # Calculate transformation on image
-    trans_input = get_affine_transform(
-      c, s, rot, [opt.input_w, opt.input_h])
-    trans_output = get_affine_transform(
-      c, s, rot, [opt.output_w, opt.output_h])
+        # Get annotation class ID
+        cls_id = int(self.cat_ids[ann['category_id']])
+        
+        # Skip if class outsize of number of classes or false
+        if cls_id > self.opt.num_classes or cls_id <= -999:
+          continue
 
-    # Resize and re colour image for data augmentation
-    inp = self._get_input(img, trans_input)
-    ret = {'image': inp}
-    gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
+        # Convert bounding box from coco
+        bbox, bbox_amodal = self._get_bbox_output(ann['bbox'])
+        
+        # Create mask for objects to ignore
+        if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
+          self._mask_ignore_or_crowd(ret, cls_id, bbox)
+          continue
 
-    # Tracking parameters
-    pre_cts, track_ids = None, None
-    if opt.tracking:
-      pre_image, pre_anns, frame_dist = self._load_pre_data(
-        img_info['video_id'], img_info['frame_id'], 
-        img_info['sensor_id'] if 'sensor_id' in img_info else 1)
-      if flipped:
-        pre_image = pre_image[:, ::-1, :].copy()
-        pre_anns = self._flip_anns(pre_anns, width)
-      if opt.same_aug_pre and frame_dist != 0:
-        trans_input_pre = trans_input
-        trans_output_pre = trans_output
+        # Add information to ret
+        self._add_instance(
+          ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, aug_s, 
+          calib, pre_cts, track_ids)
+
+      if self.opt.debug > 0:
+        gt_det = self._format_gt_det(gt_det)
+        meta = {'c': c, 's': s, 'gt_det': gt_det, 'img_id': img_info['id'],
+                'img_path': img_path, 'calib': calib,
+                'flipped': flipped}
+        ret['meta'] = meta
+      
+      # If instance batching, need to gather all rets
+      if not self.instance_batching:
+        return ret
       else:
-        c_pre, aug_s_pre, _ = self._get_aug_param(
-          c, s, width, height, disturb=True)
-        s_pre = s * aug_s_pre
-        trans_input_pre = get_affine_transform(
-          c_pre, s_pre, rot, [opt.input_w, opt.input_h])
-        trans_output_pre = get_affine_transform(
-          c_pre, s_pre, rot, [opt.output_w, opt.output_h])
-      pre_img = self._get_input(pre_image, trans_input_pre)
-      pre_hm, pre_cts, track_ids = self._get_pre_dets(
-        pre_anns, trans_input_pre, trans_output_pre)
-      ret['pre_img'] = pre_img
-      if opt.pre_hm:
-        ret['pre_hm'] = pre_hm
+        rets.append(ret)
 
-    ### init samples
-    self._init_ret(ret, gt_det)
+  def _get_bbox_output(self, bbox):
+    # From min_x,min_y, w,h to minx,miny,maxx,maxy
+    bbox = self._coco_box_to_bbox(bbox).copy()
 
-    # Get calibration information from image info
-    calib = self._get_calib(img_info, width, height)
+    # Amodal bounding box for detections that are truncated
+    bbox_amodal = copy.deepcopy(bbox)
+    bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.opt.output_w - 1)
+    bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.opt.output_h - 1)
+    h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
+    return bbox, bbox_amodal
 
-    num_objs = min(len(anns), self.max_objs)
-    for k in range(num_objs):
-      ann = anns[k]
-      cls_id = int(self.cat_ids[ann['category_id']])
-      if cls_id > self.opt.num_classes or cls_id <= -999:
-        continue
-      bbox, bbox_amodal = self._get_bbox_output(
-        ann['bbox'], trans_output, height, width)
-      if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
-        self._mask_ignore_or_crowd(ret, cls_id, bbox)
-        continue
-      self._add_instance(
-        ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, aug_s, 
-        calib, pre_cts, track_ids)
+  # Initialise return before filling in
+  def _init_ret(self, ret, gt_det):
+    max_objs = self.max_objs * self.opt.dense_reg
+    ret['hm'] = np.zeros(
+      (self.opt.num_classes, self.opt.output_h, self.opt.output_w), 
+      np.float32)
+    ret['ind'] = np.zeros((max_objs), dtype=np.int64)
+    ret['cat'] = np.zeros((max_objs), dtype=np.int64)
+    ret['mask'] = np.zeros((max_objs), dtype=np.float32)
 
-    if self.opt.debug > 0:
-      gt_det = self._format_gt_det(gt_det)
-      meta = {'c': c, 's': s, 'gt_det': gt_det, 'img_id': img_info['id'],
-              'img_path': img_path, 'calib': calib,
-              'flipped': flipped}
-      ret['meta'] = meta
-    return ret
+    regression_head_dims = {
+      'reg': 2, 'wh': 2, 'tracking': 2, 'ltrb': 4, 'ltrb_amodal': 4, 
+      'nuscenes_att': 8, 'velocity': 3, 'hps': self.num_joints * 2, 
+      'dep': 1, 'dim': 3, 'amodel_offset': 2}
+
+    for head in regression_head_dims:
+      if head in self.opt.heads:
+        ret[head] = np.zeros(
+          (max_objs, regression_head_dims[head]), dtype=np.float32)
+        ret[head + '_mask'] = np.zeros(
+          (max_objs, regression_head_dims[head]), dtype=np.float32)
+        gt_det[head] = []
+
+    if 'hm_hp' in self.opt.heads:
+      num_joints = self.num_joints
+      ret['hm_hp'] = np.zeros(
+        (num_joints, self.opt.output_h, self.opt.output_w), dtype=np.float32)
+      ret['hm_hp_mask'] = np.zeros(
+        (max_objs * num_joints), dtype=np.float32)
+      ret['hp_offset'] = np.zeros(
+        (max_objs * num_joints, 2), dtype=np.float32)
+      ret['hp_ind'] = np.zeros((max_objs * num_joints), dtype=np.int64)
+      ret['hp_offset_mask'] = np.zeros(
+        (max_objs * num_joints, 2), dtype=np.float32)
+      ret['joint'] = np.zeros((max_objs * num_joints), dtype=np.int64)
+    
+    if 'rot' in self.opt.heads:
+      ret['rotbin'] = np.zeros((max_objs, 2), dtype=np.int64)
+      ret['rotres'] = np.zeros((max_objs, 2), dtype=np.float32)
+      ret['rot_mask'] = np.zeros((max_objs), dtype=np.float32)
+      gt_det.update({'rot': []})
+
+  # Get calibration information
+  def _get_calib(img_info):
+    calibration_info = {}
+    calibration_info["P"] = img_info['P']
+    calibration_info["dist_coefs"] = img_info['dist_coefs']
+    calibration_info["rvec"] = img_info['rvec']
+    calibration_info["tvec"] = img_info['tvec']
+    calibration_info["theta_X_d"] = img_info['theta_X_d']
 
   # Called by get_item to add data to the return variable
   def _add_instance(
@@ -275,43 +299,79 @@ class WIBAM(GenericDataset):
       else:
         gt_det['amodel_offset'].append([0, 0])
 
-  # Loads image annotations from file
-  def _load_image_anns(self, img_id, coco, img_dir, instance=False):
-    img_info = coco.loadImgs(ids=[img_id])[0]
-    file_name = img_info['file_name']
-    img_path = os.path.join(img_dir, file_name)
-    ann_ids = coco.getAnnIds(imgIds=[img_id])
-    anns = copy.deepcopy(coco.loadAnns(ids=ann_ids))
-    img = cv2.imread(img_path)
-    return img, anns, img_info, img_path, instance
-
-  # Loads calibration information
-  def _get_calib():
-    if 'calib' in img_info:
-      calib = np.array(img_info['calib'], dtype=np.float32)
-    else:
-      calib = np.array([[self.rest_focal_length, 0, width / 2, 0], 
-                        [0, self.rest_focal_length, height / 2, 0], 
-                        [0, 0, 1, 0]])
-    return calib
-
   # Loading data, use dataloader index to get image id
   # Function for loading single image with all annotations
-  def _load_data():
-    img_id = self.images[index]
-    img, anns, img_info, img_path, instance = self._load_image_anns(img_id, self.coco, self.img_dir)
+  def _load_data(self, index):
+    if self.instance_batching:
+      id = self.instances[index]
+    else:
+      id = self.images[index]
+    img, anns, img_info, img_path = self._load_image_anns(id, self.coco, self.img_dir)
 
     return img, anns, img_info, img_path
 
-  # Function for loading all images at an instance
-  def _load_data_instance_batch():
-    instance_id = self.instances[index]
-    imgs, anns, imgs_info, imgs_path = self._load_image_anns(instance_id, self.coco, self.img_dir, instance=True)
+  # Loads image annotations from file
+  def _load_image_anns(self, id, coco, img_dir):
+    # Get number of cameras to load data from irregardless of instance batching
+    # Single camera still needs other views to formulate loss
+    # Will be image info for cam0 if instance
+    img_info = coco.loadImgs(ids=[id])[0]
+    num_cams = img_info['num_cams']
+    # Get empty lists to return
+    # In case of instance batching, will contain all images and anns
+    # For single image will contain just its own batch
+    imgs_info = []
+    imgs_path = []
+    imgs_anns = []
+    imgs = []
 
+    # Need to decipher between loading all instances at a time and singular image
+    if self.instance_batching:
+      num_loads = num_cams
+    else:
+      num_loads = 1
 
-  # May need to rewrite flip annotations due to other camera annotations being wrong
-  # TODO: Workout how it affects the system and calibrations, probably set all augmentation off initially
-  def flip_anns():
+    # For each instance being loaded retrieve information from annotations
+    for i in range(num_loads):
+      # Special case when instance batching that time ID corresponds to cam 0
+      # of that instance, and each cam after is id + 1,2,3
+      img_id = id + i
+
+      img_info = coco.loadImgs(ids=[img_id])[0]
+      imgs_info.append(img_info)
+
+      # Cam num is also = i if instance batching
+      cam_num = img_info['cam']
+
+      # Get image path
+      file_name = img_info['file_name']
+      img_path = os.path.join(img_dir, file_name)
+      imgs_path.append(img_path)
+
+      # Load all annotations for that instance
+      for j in range(num_cams):
+        # Calculate the id number of the other camera images
+        # ie if cam_num is 2 and ID = 10, loading cam 0 annotations 
+        # needs ID = 8 (ID=9 is cam 1). 
+        # Therefore cam_ID = current_ID + index - cam
+        ann_img_id = img_id + j - cam_num
+
+        # Use coco utils to get annotation IDs for image instance
+        ann_ids = coco.getAnnIds(imgIds=[ann_img_id])
+        # Copy recursively all the annotations for that image
+        anns = copy.deepcopy(coco.loadAnns(ids=ann_ids))
+        # Add this to the annotations for this camera
+        imgs_anns.append(anns)
+
+      # Load and append image
+      imgs.append(cv2.imread(img_path))
+
+    # Return results
+    return imgs, imgs_anns, imgs_info, imgs_path
+
+  # # May need to rewrite flip annotations due to other camera annotations being wrong
+  # # TODO: Workout how it affects the system and calibrations, probably set all augmentation off initially
+  # def flip_anns():
 
   # Dataloader uses this function to create the iterable dataset
   def __len__(self):
