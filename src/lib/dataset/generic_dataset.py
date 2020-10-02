@@ -19,27 +19,38 @@ from utils.image import gaussian_radius, draw_umich_gaussian
 import copy
 
 class GenericDataset(data.Dataset):
+  # Unused variables
   is_fusion_dataset = False
   default_resolution = None
   num_categories = None
   class_name = None
+  edges = [[0, 1], [0, 2], [1, 3], [2, 4],
+           [4, 6], [3, 5], [5, 6],
+           [5, 7], [7, 9], [6, 8], [8, 10],
+           [6, 12], [5, 11], [11, 12],
+           [12, 14], [14, 16], [11, 13], [13, 15]]
   # cat_ids: map from 'category_id' in the annotation files to 1..num_categories
   # Not using 0 because 0 is used for don't care region and ignore loss.
+
+  # Category IDs, initialised incase not in annotation information
   cat_ids = None
+  # Maximum number of objects to be detected
   max_objs = None
+  # Default focal length when not specifies
   rest_focal_length = 1200
+  # Key point recon number of joints
   num_joints = 17
-  flip_idx = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], 
+  # To do with joints flipping
+  flip_idx = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10],
               [11, 12], [13, 14], [15, 16]]
-  edges = [[0, 1], [0, 2], [1, 3], [2, 4], 
-           [4, 6], [3, 5], [5, 6], 
-           [5, 7], [7, 9], [6, 8], [8, 10], 
-           [6, 12], [5, 11], [11, 12], 
-           [12, 14], [14, 16], [11, 13], [13, 15]]
+
+  # For flipping annotations
   mean = np.array([0.40789654, 0.44719302, 0.47026115],
                    dtype=np.float32).reshape(1, 1, 3)
   std  = np.array([0.28863828, 0.27408164, 0.27809835],
                    dtype=np.float32).reshape(1, 1, 3)
+  
+  # Colour augmentation
   _eig_val = np.array([0.2141788, 0.01817699, 0.00341571],
                       dtype=np.float32)
   _eig_vec = np.array([
@@ -47,8 +58,12 @@ class GenericDataset(data.Dataset):
         [-0.5832747, 0.00994535, -0.81221408],
         [-0.56089297, 0.71832671, 0.41158938]
     ], dtype=np.float32)
+
+  # Set for ignoring on heat maps
   ignore_val = 1
-  nuscenes_att_range = {0: [0, 1], 1: [0, 1], 2: [2, 3, 4], 3: [2, 3, 4], 
+
+  # nuscenes specific variables
+  nuscenes_att_range = {0: [0, 1], 1: [0, 1], 2: [2, 3, 4], 3: [2, 3, 4],
     4: [2, 3, 4], 5: [5, 6, 7], 6: [5, 6, 7], 7: [5, 6, 7]}
   def __init__(self, opt=None, split=None, ann_path=None, img_dir=None, multi_cam=None):
     super(GenericDataset, self).__init__()
@@ -76,6 +91,7 @@ class GenericDataset(data.Dataset):
 
       self.img_dir = img_dir
 
+  # Function to get singular image + annotation information, will be called several times each batch
   def __getitem__(self, index):
     opt = self.opt
     img, anns, img_info, img_path = self._load_data(index)
@@ -85,6 +101,8 @@ class GenericDataset(data.Dataset):
     s = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
       else np.array([img.shape[1], img.shape[0]], np.float32)
     aug_s, rot, flipped = 1, 0, 0
+
+    # If training split perform flip augmentation
     if self.split == 'train':
       c, aug_s, rot = self._get_aug_param(c, s, width, height)
       s = s * aug_s
@@ -93,14 +111,18 @@ class GenericDataset(data.Dataset):
         img = img[:, ::-1, :]
         anns = self._flip_anns(anns, width)
 
+    # Calculate transformation on image
     trans_input = get_affine_transform(
       c, s, rot, [opt.input_w, opt.input_h])
     trans_output = get_affine_transform(
       c, s, rot, [opt.output_w, opt.output_h])
+
+    # Resize and re colour image for data augmentation
     inp = self._get_input(img, trans_input)
     ret = {'image': inp}
     gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
 
+    # Tracking parameters
     pre_cts, track_ids = None, None
     if opt.tracking:
       pre_image, pre_anns, frame_dist = self._load_pre_data(
@@ -126,11 +148,13 @@ class GenericDataset(data.Dataset):
       ret['pre_img'] = pre_img
       if opt.pre_hm:
         ret['pre_hm'] = pre_hm
-    
+
     ### init samples
     self._init_ret(ret, gt_det)
+
+    # Get calibration information from image info
     calib = self._get_calib(img_info, width, height)
-    
+
     num_objs = min(len(anns), self.max_objs)
     for k in range(num_objs):
       ann = anns[k]
@@ -154,13 +178,14 @@ class GenericDataset(data.Dataset):
       ret['meta'] = meta
     return ret
 
-
+  # Creates calibration information when none contained in annotation
   def get_default_calib(self, width, height):
     calib = np.array([[self.rest_focal_length, 0, width / 2, 0], 
                         [0, self.rest_focal_length, height / 2, 0], 
                         [0, 0, 1, 0]])
     return calib
 
+  # Loads annotations for a given image ID
   def _load_image_anns(self, img_id, coco, img_dir):
     img_info = coco.loadImgs(ids=[img_id])[0]
     file_name = img_info['file_name']
@@ -170,6 +195,7 @@ class GenericDataset(data.Dataset):
     img = cv2.imread(img_path)
     return img, anns, img_info, img_path
 
+  # Load data
   def _load_data(self, index):
     coco = self.coco
     img_dir = self.img_dir
@@ -178,10 +204,10 @@ class GenericDataset(data.Dataset):
 
     return img, anns, img_info, img_path
 
-
+  # Tracking requires pre-data, function loads this.
   def _load_pre_data(self, video_id, frame_id, sensor_id=1):
     img_infos = self.video_to_images[video_id]
-    # If training, random sample nearby frames as the "previoud" frame
+    # If training, random sample nearby frames as the "previous" frame
     # If testing, get the exact prevous frame
     if 'train' in self.split:
       img_ids = [(img_info['id'], img_info['frame_id']) \
@@ -204,7 +230,7 @@ class GenericDataset(data.Dataset):
     img, anns, _, _ = self._load_image_anns(img_id, self.coco, self.img_dir)
     return img, anns, frame_dist
 
-
+  # Get previous detections for tracking
   def _get_pre_dets(self, anns, trans_input, trans_output):
     hm_h, hm_w = self.opt.input_h, self.opt.input_w
     down_ratio = self.opt.down_ratio
@@ -257,13 +283,14 @@ class GenericDataset(data.Dataset):
 
     return pre_hm, pre_cts, track_ids
 
+  # 
   def _get_border(self, border, size):
     i = 1
     while size - border // i <= border // i:
         i *= 2
     return border // i
 
-
+  # 
   def _get_aug_param(self, c, s, width, height, disturb=False):
     if (not self.opt.not_rand_crop) and not disturb:
       aug_s = np.random.choice(np.arange(0.6, 1.4, 0.1))
@@ -288,7 +315,7 @@ class GenericDataset(data.Dataset):
     
     return c, aug_s, rot
 
-
+  # Flip annotations
   def _flip_anns(self, anns, width):
     for k in range(len(anns)):
       bbox = anns[k]['bbox']
@@ -316,12 +343,12 @@ class GenericDataset(data.Dataset):
 
     return anns
 
-
+  # Transforms input for data augmentation
   def _get_input(self, img, trans_input):
-    inp = cv2.warpAffine(img, trans_input, 
+    inp = cv2.warpAffine(img, trans_input,
                         (self.opt.input_w, self.opt.input_h),
                         flags=cv2.INTER_LINEAR)
-    
+
     inp = (inp.astype(np.float32) / 255.)
     if self.split == 'train' and not self.opt.no_color_aug:
       color_aug(self._data_rng, inp, self._eig_val, self._eig_vec)
@@ -329,7 +356,7 @@ class GenericDataset(data.Dataset):
     inp = inp.transpose(2, 0, 1)
     return inp
 
-
+  #Initialise empty dictionary for annotations
   def _init_ret(self, ret, gt_det):
     max_objs = self.max_objs * self.opt.dense_reg
     ret['hm'] = np.zeros(
@@ -371,7 +398,7 @@ class GenericDataset(data.Dataset):
       ret['rot_mask'] = np.zeros((max_objs), dtype=np.float32)
       gt_det.update({'rot': []})
 
-
+  # Get single calibration information from annotation file
   def _get_calib(self, img_info, width, height):
     if 'calib' in img_info:
       calib = np.array(img_info['calib'], dtype=np.float32)
@@ -381,11 +408,12 @@ class GenericDataset(data.Dataset):
                         [0, 0, 1, 0]])
     return calib
 
-
+  # Used to create mask over region for _mask_ignore_or_crowd
   def _ignore_region(self, region, ignore_val=1):
     np.maximum(region, ignore_val, out=region)
 
-
+  # Gets bounding box and class information to mask it in ret
+  # not included in prediction
   def _mask_ignore_or_crowd(self, ret, cls_id, bbox):
     # mask out crowd region, only rectangular mask is supported
     if cls_id == 0: # ignore all classes
@@ -400,13 +428,13 @@ class GenericDataset(data.Dataset):
       self._ignore_region(ret['hm_hp'][:, int(bbox[1]): int(bbox[3]) + 1, 
                                           int(bbox[0]): int(bbox[2]) + 1])
 
-
+  # converts coco box to x_min,y_min,x_max,y_max
   def _coco_box_to_bbox(self, box):
     bbox = np.array([box[0], box[1], box[0] + box[2], box[1] + box[3]],
                     dtype=np.float32)
     return bbox
 
-
+  #
   def _get_bbox_output(self, bbox, trans_output, height, width):
     bbox = self._coco_box_to_bbox(bbox).copy()
 
@@ -423,6 +451,7 @@ class GenericDataset(data.Dataset):
     h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
     return bbox, bbox_amodal
 
+  # Adds a ground truth to the RET output
   def _add_instance(
     self, ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output,
     aug_s, calib, pre_cts=None, track_ids=None):
@@ -450,9 +479,6 @@ class GenericDataset(data.Dataset):
     gt_det['scores'].append(1)
     gt_det['clses'].append(cls_id - 1)
     gt_det['cts'].append(ct)
-
-    # TODO: Add in multi-view data initilisation
-
 
     if 'tracking' in self.opt.heads:
       if ann['track_id'] in track_ids:
@@ -518,8 +544,8 @@ class GenericDataset(data.Dataset):
         gt_det['amodel_offset'].append(ret['amodel_offset'][k])
       else:
         gt_det['amodel_offset'].append([0, 0])
-    
 
+  # To do with key point detection
   def _add_hps(self, ret, k, ann, gt_det, trans_output, ct_int, bbox, h, w):
     num_joints = self.num_joints
     pts = np.array(ann['keypoints'], np.float32).reshape(num_joints, 3) \
@@ -559,6 +585,7 @@ class GenericDataset(data.Dataset):
                           int(bbox[0]): int(bbox[2]) + 1])
     gt_det['hps'].append(pts[:, :2].reshape(num_joints * 2))
 
+  # Converts alpha measurement to multibin 8 var ground truth
   def _add_rot(self, ret, ann, k, gt_det):
     if 'alpha' in ann:
       ret['rot_mask'][k] = 1
@@ -572,7 +599,8 @@ class GenericDataset(data.Dataset):
       gt_det['rot'].append(self._alpha_to_8(ann['alpha']))
     else:
       gt_det['rot'].append(self._alpha_to_8(0))
-    
+
+  # Converts alpha measurement to multibin 8 var
   def _alpha_to_8(self, alpha):
     ret = [0, 0, 0, 1, 0, 0, 0, 1]
     if alpha < np.pi / 6. or alpha > 5 * np.pi / 6.:
@@ -584,7 +612,8 @@ class GenericDataset(data.Dataset):
       ret[5] = 1
       ret[6], ret[7] = np.sin(r), np.cos(r)
     return ret
-  
+
+  # Creates a gt dictionary
   def _format_gt_det(self, gt_det):
     if (len(gt_det['scores']) == 0):
       gt_det = {'bboxes': np.array([[0,0,1,1]], dtype=np.float32), 
@@ -598,6 +627,7 @@ class GenericDataset(data.Dataset):
     gt_det = {k: np.array(gt_det[k], dtype=np.float32) for k in gt_det}
     return gt_det
 
+  #
   def fake_video_data(self):
     self.coco.dataset['videos'] = []
     for i in range(len(self.coco.dataset['images'])):

@@ -31,7 +31,7 @@ def main(opt):
   torch.manual_seed(opt.seed)
   torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
-  # Initialise dataset
+  # Get dataset name
   Dataset = get_dataset(opt.dataset)
 
   # Initialise training task
@@ -76,6 +76,7 @@ def main(opt):
       val_loader.dataset.run_eval(preds, opt.save_dir)
       return
 
+  # Initialising trianing dataset
   print('Setting up train data...')
   train_loader = torch.utils.data.DataLoader(
       Dataset(opt, 'train'), batch_size=opt.batch_size, shuffle=True,

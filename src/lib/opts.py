@@ -202,6 +202,8 @@ class opts(object):
     self.parser.add_argument('--no_color_aug', action='store_true',
                              help='not use the color augmenation '
                                   'from CornerNet')
+    self.parser.add_argument('--instance_batching', action='store_true',
+                             help='Load all images from cams at instance?')
 
     # Tracking
     self.parser.add_argument('--tracking', action='store_true')
