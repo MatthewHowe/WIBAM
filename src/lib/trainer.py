@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import cv2
 import time
 import torch
 import numpy as np
@@ -155,6 +156,14 @@ class Trainer(object):
         break
 
       data_time.update(time.time() - end)
+
+      
+      # cv2.namedWindow("Preview", cv2.WINDOW_NORMAL)
+      # for inp in batch['hm']:
+      #   img = inp.numpy()
+      #   img = img.transpose(1,2,0)
+      #   cv2.imshow("Preview", img)
+      #   cv2.waitKey(1)
 
       # Put batches to GPU
       for k in batch:

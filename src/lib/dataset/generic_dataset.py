@@ -97,15 +97,15 @@ class GenericDataset(data.Dataset):
     img, anns, img_info, img_path = self._load_data(index)
 
     height, width = img.shape[0], img.shape[1]
-    c = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
-    s = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
+    center = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
+    scale = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
       else np.array([img.shape[1], img.shape[0]], np.float32)
     aug_s, rot, flipped = 1, 0, 0
 
     # If training split perform flip augmentation
     if self.split == 'train':
-      c, aug_s, rot = self._get_aug_param(c, s, width, height)
-      s = s * aug_s
+      center, aug_s, rot = self._get_aug_param(center, scale, width, height)
+      scale = scale * aug_s
       if np.random.random() < opt.flip:
         flipped = 1
         img = img[:, ::-1, :]
@@ -113,9 +113,9 @@ class GenericDataset(data.Dataset):
 
     # Calculate transformation on image
     trans_input = get_affine_transform(
-      c, s, rot, [opt.input_w, opt.input_h])
+      center, scale, rot, [opt.input_w, opt.input_h])
     trans_output = get_affine_transform(
-      c, s, rot, [opt.output_w, opt.output_h])
+      center, scale, rot, [opt.output_w, opt.output_h])
 
     # Resize and re colour image for data augmentation
     inp = self._get_input(img, trans_input)
@@ -136,8 +136,8 @@ class GenericDataset(data.Dataset):
         trans_output_pre = trans_output
       else:
         c_pre, aug_s_pre, _ = self._get_aug_param(
-          c, s, width, height, disturb=True)
-        s_pre = s * aug_s_pre
+          center, scale, width, height, disturb=True)
+        s_pre = scale * aug_s_pre
         trans_input_pre = get_affine_transform(
           c_pre, s_pre, rot, [opt.input_w, opt.input_h])
         trans_output_pre = get_affine_transform(
@@ -172,7 +172,7 @@ class GenericDataset(data.Dataset):
 
     if self.opt.debug > 0:
       gt_det = self._format_gt_det(gt_det)
-      meta = {'c': c, 's': s, 'gt_det': gt_det, 'img_id': img_info['id'],
+      meta = {'c': center, 's': scale, 'gt_det': gt_det, 'img_id': img_info['id'],
               'img_path': img_path, 'calib': calib,
               'flipped': flipped}
       ret['meta'] = meta
@@ -435,7 +435,8 @@ class GenericDataset(data.Dataset):
     return bbox
 
   # Converts bounding box and transforms it if augmentation has occured
-  def _get_bbox_output(self, bbox, trans_output, height, width):
+  def _get_bbox_output(self, bbox, trans_output):
+    # From min_x,min_y, w,h to minx,miny,maxx,maxy
     bbox = self._coco_box_to_bbox(bbox).copy()
 
     rect = np.array([[bbox[0], bbox[1]], [bbox[0], bbox[3]],
@@ -445,6 +446,7 @@ class GenericDataset(data.Dataset):
     bbox[:2] = rect[:, 0].min(), rect[:, 1].min()
     bbox[2:] = rect[:, 0].max(), rect[:, 1].max()
 
+    # Amodal bounding box for detections that are truncated
     bbox_amodal = copy.deepcopy(bbox)
     bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.opt.output_w - 1)
     bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.opt.output_h - 1)

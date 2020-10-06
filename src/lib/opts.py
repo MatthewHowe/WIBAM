@@ -197,7 +197,7 @@ class opts(object):
     self.parser.add_argument('--rotate', type=float, default=0,
                              help='when not using random crop'
                                   'apply rotation augmentation.')
-    self.parser.add_argument('--flip', type=float, default=0.5,
+    self.parser.add_argument('--flip', type=float, default=0,
                              help='probability of applying flip augmentation.')
     self.parser.add_argument('--no_color_aug', action='store_true',
                              help='not use the color augmenation '
@@ -354,8 +354,13 @@ class opts(object):
     if 'tracking' in opt.task:
       opt.heads.update({'tracking': 2})
 
+    # Remove 'ddd' with amodel_offset
+    # if 'ddd' in opt.task:
+    #   opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3, 'amodel_offset': 2})
+    
+    # Replace with one with no amodel offset
     if 'ddd' in opt.task:
-      opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3, 'amodel_offset': 2})
+      opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3})
 
     if 'multi_pose' in opt.task:
       opt.heads.update({

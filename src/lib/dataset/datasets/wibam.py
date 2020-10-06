@@ -9,14 +9,16 @@ import json
 import cv2
 import os
 import math
+import copy
 
+from utils.image import get_affine_transform, affine_transform
 from ..generic_dataset import GenericDataset
 from utils.ddd_utils import compute_box_3d, project_to_image
 from utils.image import gaussian_radius, draw_umich_gaussian
 
 class WIBAM(GenericDataset):
   num_categories = 1
-  default_resolution = [1080, 1920]
+  default_resolution = [1088, 1920]
   # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
   #       'Tram', 'Misc', 'DontCare']
   class_name = ['Car']
@@ -24,16 +26,19 @@ class WIBAM(GenericDataset):
   # 0 for ignore losses for all categories in the bounding box region
   cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
   max_objs = 50
+
+  # Initialisation function
   def __init__(self, opt, split):
     # Define specific locations of dataset files
     data_dir = os.path.join(opt.data_dir, 'wibam')
     img_dir = os.path.join(data_dir, 'frames')
     # Where instance sets are kept
     split_dir = os.path.join(data_dir, 'image_sets')
-    
+    self.instances = []
     # Count the number of lines in the image set, which indicates time instances
-    with open(os.path.join(split_dir, 'wibam_{}.txt'.format(split))) as img_split:
-      self.instances =  sum(1 for _ in image_set)
+    with open(os.path.join(split_dir, '{}.txt'.format(split))) as image_set:
+      for line in image_set:
+        self.instances.append(int(line))
 
     # Get annotation path
     ann_path = os.path.join(data_dir,
@@ -75,9 +80,23 @@ class WIBAM(GenericDataset):
 
     rets = []
 
-    for i in range(len(imgs))
+    for i in range(len(imgs)):
+      img = imgs[i]
+      height, width = img.shape[0], img.shape[1]
+      center = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
+      scale = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
+        else np.array([img.shape[1], img.shape[0]], np.float32)
+      aug_s, rot, flipped = 1, 0, 0
+
+      # Calculate transformation on image
+      trans_input = get_affine_transform(
+        center, scale, rot, [opt.input_w, opt.input_h])
+      trans_output = get_affine_transform(
+        center, scale, rot, [opt.output_w, opt.output_h])
+
+      inp = self._get_input(img, trans_input)
       # initialise return variable
-      ret = {'image': imgs[i]}
+      ret = {'image': inp}
       # initialise gt dictionary
       gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
 
@@ -89,7 +108,7 @@ class WIBAM(GenericDataset):
       calib = self._get_calib(imgs_info[i])
 
       # Number of objects minimum of detections or max objects
-      num_objs = min(len(anns), self.max_objs)
+      num_objs = min(len(imgs_anns[i]), self.max_objs)
 
       # For all objects
       for k in range(num_objs):
@@ -99,12 +118,12 @@ class WIBAM(GenericDataset):
         # Get annotation class ID
         cls_id = int(self.cat_ids[ann['category_id']])
         
-        # Skip if class outsize of number of classes or false
+        # Skip if class outsize of number of clasaug_sses or false
         if cls_id > self.opt.num_classes or cls_id <= -999:
           continue
 
         # Convert bounding box from coco
-        bbox, bbox_amodal = self._get_bbox_output(ann['bbox'])
+        bbox, bbox_amodal = self._get_bbox_output(ann['bbox'], trans_output)
         
         # Create mask for objects to ignore
         if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
@@ -112,9 +131,9 @@ class WIBAM(GenericDataset):
           continue
 
         # Add information to ret
+        # GT_det dict is used for debugging
         self._add_instance(
-          ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, aug_s, 
-          calib, pre_cts, track_ids)
+          ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, calib)
 
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)
@@ -129,16 +148,73 @@ class WIBAM(GenericDataset):
       else:
         rets.append(ret)
 
-  def _get_bbox_output(self, bbox):
-    # From min_x,min_y, w,h to minx,miny,maxx,maxy
-    bbox = self._coco_box_to_bbox(bbox).copy()
+    return rets
 
-    # Amodal bounding box for detections that are truncated
-    bbox_amodal = copy.deepcopy(bbox)
-    bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.opt.output_w - 1)
-    bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.opt.output_h - 1)
-    h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
-    return bbox, bbox_amodal
+  # Transforms input for data augmentation
+  def _get_input(self, img, trans_input):
+    inp = cv2.warpAffine(img, trans_input,
+                        (self.opt.input_w, self.opt.input_h),
+                        flags=cv2.INTER_LINEAR)
+
+    inp = (inp.astype(np.float32) / 255.)
+    inp = (inp - self.mean) / self.std
+    inp = inp.transpose(2, 0, 1)
+    return inp
+
+  # Used to compile the ret variable with information
+  def _add_instance(
+    self, ret, gt_det, k, cls_id, bbox_hm, bbox_input, ann,
+    trans_output, calib):
+
+    # Get size of bounding box
+    h, w = bbox_hm[3] - bbox_hm[1], bbox_hm[2] - bbox_hm[0]
+    # Ensure bounding box is positive
+    if h <= 0 or w <= 0:
+      return
+
+    # Create a gaussian for the heat map for objects
+    radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+    radius = max(0, int(radius))
+
+    # Get the centre of the object
+    ct = np.array(
+      [(bbox_hm[0] + bbox_hm[2]) / 2, (bbox_hm[1] + bbox_hm[3]) / 2], dtype=np.float32)
+    ct_int = ct.astype(np.int32)
+    
+    # Input the category
+    ret['cat'][k] = cls_id - 1
+    # Mask indicated that a valid object is at instance k in ret
+    ret['mask'][k] = 1
+
+    # wh refers to width and height of bounding box
+    if 'wh' in ret:
+      ret['wh'][k] = 1. * w, 1. * h
+      ret['wh_mask'][k] = 1
+    
+    # Add original bbox for loss
+    ret['bbox'] = bbox_input
+
+    # Index of centre location
+    ret['ind'][k] = ct_int[1] * self.opt.output_w + ct_int[0]
+    # Offset of int and float (decimal part of centre)
+    ret['reg'][k] = ct - ct_int
+    # Mask indicating that a reg is present?
+    ret['reg_mask'][k] = 1
+    # Create heatmap
+    draw_umich_gaussian(ret['hm'][cls_id - 1], ct_int, radius)
+
+    # Put bbox into gt_boxes
+    gt_det['bboxes'].append(
+      np.array([ct[0] - w / 2, ct[1] - h / 2,
+                ct[0] + w / 2, ct[1] + h / 2], dtype=np.float32))
+    # Set detection score
+    gt_det['scores'].append(ann['score'])
+    # Set classes list to gt
+    gt_det['clses'].append(cls_id - 1)
+    # Add centers to gt
+    gt_det['cts'].append(ct)
+
+    # Removed depth, rot, etc since they dont exist for this dataset
 
   # Initialise return before filling in
   def _init_ret(self, ret, gt_det):
@@ -151,9 +227,7 @@ class WIBAM(GenericDataset):
     ret['mask'] = np.zeros((max_objs), dtype=np.float32)
 
     regression_head_dims = {
-      'reg': 2, 'wh': 2, 'tracking': 2, 'ltrb': 4, 'ltrb_amodal': 4, 
-      'nuscenes_att': 8, 'velocity': 3, 'hps': self.num_joints * 2, 
-      'dep': 1, 'dim': 3, 'amodel_offset': 2}
+      'reg': 2, 'wh': 2}
 
     for head in regression_head_dims:
       if head in self.opt.heads:
@@ -183,121 +257,13 @@ class WIBAM(GenericDataset):
       gt_det.update({'rot': []})
 
   # Get calibration information
-  def _get_calib(img_info):
+  def _get_calib(self, img_info):
     calibration_info = {}
     calibration_info["P"] = img_info['P']
     calibration_info["dist_coefs"] = img_info['dist_coefs']
     calibration_info["rvec"] = img_info['rvec']
     calibration_info["tvec"] = img_info['tvec']
     calibration_info["theta_X_d"] = img_info['theta_X_d']
-
-  # Called by get_item to add data to the return variable
-  def _add_instance(
-    self, ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output,
-    aug_s, calib, pre_cts=None, track_ids=None):
-
-    # Get size of bounding box
-    h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
-    # Return if the bounding box size is negative or zero
-    if h <= 0 or w <= 0:
-      return
-
-    radius = gaussian_radius((math.ceil(h), math.ceil(w)))
-    radius = max(0, int(radius)) 
-
-    ct = np.array(
-      [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2], dtype=np.float32)
-
-    ct_int = ct.astype(np.int32)
-
-    # Add category to return dict
-    ret['cat'][k] = cls_id - 1
-
-    # Indicate there is an annotation at this position
-    ret['mask'][k] = 1
-    if 'wh' in ret:
-      # Add width and height to return dict
-      ret['wh'][k] = 1. * w, 1. * h
-      # Indicate object has width and height data
-      ret['wh_mask'][k] = 1
-
-    # 
-    ret['ind'][k] = ct_int[1] * self.opt.output_w + ct_int[0]
-    ret['reg'][k] = ct - ct_int
-    ret['reg_mask'][k] = 1
-    draw_umich_gaussian(ret['hm'][cls_id - 1], ct_int, radius)
-
-    gt_det['bboxes'].append(
-      np.array([ct[0] - w / 2, ct[1] - h / 2,
-                ct[0] + w / 2, ct[1] + h / 2], dtype=np.float32))
-    gt_det['scores'].append(1)
-    gt_det['clses'].append(cls_id - 1)
-    gt_det['cts'].append(ct)
-
-    if 'tracking' in self.opt.heads:
-      if ann['track_id'] in track_ids:
-        pre_ct = pre_cts[track_ids.index(ann['track_id'])]
-        ret['tracking_mask'][k] = 1
-        ret['tracking'][k] = pre_ct - ct_int
-        gt_det['tracking'].append(ret['tracking'][k])
-      else:
-        gt_det['tracking'].append(np.zeros(2, np.float32))
-
-    if 'ltrb' in self.opt.heads:
-      ret['ltrb'][k] = bbox[0] - ct_int[0], bbox[1] - ct_int[1], \
-        bbox[2] - ct_int[0], bbox[3] - ct_int[1]
-      ret['ltrb_mask'][k] = 1
-
-    if 'ltrb_amodal' in self.opt.heads:
-      ret['ltrb_amodal'][k] = \
-        bbox_amodal[0] - ct_int[0], bbox_amodal[1] - ct_int[1], \
-        bbox_amodal[2] - ct_int[0], bbox_amodal[3] - ct_int[1]
-      ret['ltrb_amodal_mask'][k] = 1
-      gt_det['ltrb_amodal'].append(bbox_amodal)
-
-    if 'nuscenes_att' in self.opt.heads:
-      if ('attributes' in ann) and ann['attributes'] > 0:
-        att = int(ann['attributes'] - 1)
-        ret['nuscenes_att'][k][att] = 1
-        ret['nuscenes_att_mask'][k][self.nuscenes_att_range[att]] = 1
-      gt_det['nuscenes_att'].append(ret['nuscenes_att'][k])
-
-    if 'velocity' in self.opt.heads:
-      if ('velocity' in ann) and min(ann['velocity']) > -1000:
-        ret['velocity'][k] = np.array(ann['velocity'], np.float32)[:3]
-        ret['velocity_mask'][k] = 1
-      gt_det['velocity'].append(ret['velocity'][k])
-
-    if 'hps' in self.opt.heads:
-      self._add_hps(ret, k, ann, gt_det, trans_output, ct_int, bbox, h, w)
-
-    if 'rot' in self.opt.heads:
-      self._add_rot(ret, ann, k, gt_det)
-
-    if 'dep' in self.opt.heads:
-      if 'depth' in ann:
-        ret['dep_mask'][k] = 1
-        ret['dep'][k] = ann['depth'] * aug_s
-        gt_det['dep'].append(ret['dep'][k])
-      else:
-        gt_det['dep'].append(2)
-
-    if 'dim' in self.opt.heads:
-      if 'dim' in ann:
-        ret['dim_mask'][k] = 1
-        ret['dim'][k] = ann['dim']
-        gt_det['dim'].append(ret['dim'][k])
-      else:
-        gt_det['dim'].append([1,1,1])
-    
-    if 'amodel_offset' in self.opt.heads:
-      if 'amodel_center' in ann:
-        amodel_center = affine_transform(ann['amodel_center'], trans_output)
-        ret['amodel_offset_mask'][k] = 1
-        ret['amodel_offset'][k] = amodel_center - ct_int
-        gt_det['amodel_offset'].append(ret['amodel_offset'][k])
-      else:
-        gt_det['amodel_offset'].append([0, 0])
 
   # Loading data, use dataloader index to get image id
   # Function for loading single image with all annotations
@@ -362,6 +328,8 @@ class WIBAM(GenericDataset):
         anns = copy.deepcopy(coco.loadAnns(ids=ann_ids))
         # Add this to the annotations for this camera
         imgs_anns.append(anns)
+
+        # TODO: Add grabbing of calibration info for each camera
 
       # Load and append image
       imgs.append(cv2.imread(img_path))
