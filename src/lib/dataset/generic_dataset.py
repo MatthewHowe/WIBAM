@@ -162,7 +162,7 @@ class GenericDataset(data.Dataset):
       if cls_id > self.opt.num_classes or cls_id <= -999:
         continue
       bbox, bbox_amodal = self._get_bbox_output(
-        ann['bbox'], trans_output, height, width)
+        ann['bbox'], trans_output)
       if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
         self._mask_ignore_or_crowd(ret, cls_id, bbox)
         continue
