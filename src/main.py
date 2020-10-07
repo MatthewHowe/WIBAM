@@ -13,6 +13,7 @@ from opts import opts
 from model.model import create_model, load_model, save_model
 from model.data_parallel import DataParallel
 from logger import Logger
+from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import get_dataset
 from trainer import Trainer
 
@@ -78,9 +79,23 @@ def main(opt):
 
   # Initialising trianing dataset
   print('Setting up train data...')
+
+  if opt.instance_batching:
+    if opt.batch_size % 4 == 0:
+      batch_size = int(opt.batch_size/4)
+    else:   
+      print("[ERROR] Batch size must be divisible by num cams")
+      end()
+    collate_fn=instance_batching_collate
+  else:
+    batch_size = opt.batch_size
+    collate_fn=default_collate
+
   train_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'train'), batch_size=opt.batch_size, shuffle=True,
-      num_workers=opt.num_workers, pin_memory=True, drop_last=True
+      Dataset(opt, 'train'), batch_size=batch_size, shuffle=True,
+      num_workers=opt.num_workers, 
+      collate_fn=collate_fn, 
+      pin_memory=True, drop_last=True
   )
 
   print('Starting training...')

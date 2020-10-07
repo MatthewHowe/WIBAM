@@ -78,7 +78,7 @@ class WIBAM(GenericDataset):
     # All data augmentation code was here - removed
     ###############
 
-    rets = []
+    rets = None
 
     for i in range(len(imgs)):
       img = imgs[i]
@@ -146,7 +146,17 @@ class WIBAM(GenericDataset):
       if not self.instance_batching:
         return ret
       else:
-        rets.append(ret)
+        # If rets not initialised, initialise it by creating dict with
+        # lists for each
+        if rets is None:
+          rets = {}
+          for key, val in ret.items():
+            rets["{}".format(key)] = []
+        for key, val in ret.items():
+          rets["{}".format(key)].append(val)
+
+    for key, val in rets.items():
+      rets["{}".format(key)] = np.array(rets["{}".format(key)])
 
     return rets
 
@@ -192,7 +202,7 @@ class WIBAM(GenericDataset):
       ret['wh_mask'][k] = 1
     
     # Add original bbox for loss
-    ret['bbox'] = bbox_input
+    ret['bboxes'][k] = bbox_input
 
     # Index of centre location
     ret['ind'][k] = ct_int[1] * self.opt.output_w + ct_int[0]
@@ -225,6 +235,8 @@ class WIBAM(GenericDataset):
     ret['ind'] = np.zeros((max_objs), dtype=np.int64)
     ret['cat'] = np.zeros((max_objs), dtype=np.int64)
     ret['mask'] = np.zeros((max_objs), dtype=np.float32)
+
+    ret['bboxes'] = np.zeros((max_objs, 4), dtype=np.float32)
 
     regression_head_dims = {
       'reg': 2, 'wh': 2}
