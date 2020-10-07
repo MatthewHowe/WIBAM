@@ -167,7 +167,7 @@ class Trainer(object):
 
       # Put batches to GPU
       for k in batch:
-        if k != 'meta':
+        if k != 'meta' and k != 'calib':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
       # Run outputs for batch from model with losses

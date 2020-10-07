@@ -72,16 +72,19 @@ class WIBAM(GenericDataset):
     # output is a list of outputs for each image at instances
     # in the case of instance_batching, else just a list of one
     # image and annotaitons
-    imgs, imgs_anns, imgs_info, imgs_path = self._load_data(index)
+    imgs, cams, imgs_anns, imgs_info, imgs_path = self._load_data(index)
 
     ###############
     # All data augmentation code was here - removed
     ###############
 
+    num_cams = len(imgs_anns)
+
     rets = None
 
     for i in range(len(imgs)):
       img = imgs[i]
+      cam_num = cams[i]
       height, width = img.shape[0], img.shape[1]
       center = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
       scale = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
@@ -95,45 +98,56 @@ class WIBAM(GenericDataset):
         center, scale, rot, [opt.output_w, opt.output_h])
 
       inp = self._get_input(img, trans_input)
+      
       # initialise return variable
       ret = {'image': inp}
+      # Cam number for this image
+      ret['cam_num'] = cam_num
+      ret['calib'] = self._get_calib(imgs_info)
+
       # initialise gt dictionary
       gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
 
       ### init samples
-      self._init_ret(ret, gt_det)
+      self._init_ret(ret, gt_det, num_cams)
 
-      # Get calibration information from image info
-      # Dictionary of all calibraiton information
-      calib = self._get_calib(imgs_info[i])
+      
 
-      # Number of objects minimum of detections or max objects
-      num_objs = min(len(imgs_anns[i]), self.max_objs)
-
-      # For all objects
-      for k in range(num_objs):
-        # Get indexed annotation
-        ann = imgs_anns[i][k]
-
-        # Get annotation class ID
-        cls_id = int(self.cat_ids[ann['category_id']])
+      # For each camera add the annotation to ret
+      for cam in range(num_cams):
+        # Get calibration information from image info
+        # Dictionary of all calibraiton information
         
-        # Skip if class outsize of number of clasaug_sses or false
-        if cls_id > self.opt.num_classes or cls_id <= -999:
-          continue
 
-        # Convert bounding box from coco
-        bbox, bbox_amodal = self._get_bbox_output(ann['bbox'], trans_output)
-        
-        # Create mask for objects to ignore
-        if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
-          self._mask_ignore_or_crowd(ret, cls_id, bbox)
-          continue
+        # Number of objects minimum of detections or max objects
+        num_objs = min(len(imgs_anns[cam]), self.max_objs)
+          
+        # For all objects detected at each camera
+        for obj in range(num_objs):
+          # Get indexed annotation
+          ann = imgs_anns[cam][obj]
 
-        # Add information to ret
-        # GT_det dict is used for debugging
-        self._add_instance(
-          ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, calib)
+          # Get annotation class ID
+          cls_id = int(self.cat_ids[ann['category_id']])
+          
+          # Skip if class outsize of number of clasaug_sses or false
+          if cls_id > self.opt.num_classes or cls_id <= -999:
+            continue
+
+          # Convert bounding box from coco
+          bbox, bbox_amodal = self._get_bbox_output(ann['bbox'], trans_output)
+          
+          # Create mask for objects to ignore
+          if cls_id <= 0 or ('iscrowd' in ann and ann['iscrowd'] > 0):
+            self._mask_ignore_or_crowd(ret, cls_id, bbox)
+            continue
+
+          pred_cam = (cam == cam_num)
+
+          # Add information to ret
+          # GT_det dict is used for debugging
+          self._add_instance(
+            ret, gt_det, cam, obj, cls_id, bbox, bbox_amodal, ann, pred_cam)
 
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)
@@ -173,8 +187,7 @@ class WIBAM(GenericDataset):
 
   # Used to compile the ret variable with information
   def _add_instance(
-    self, ret, gt_det, k, cls_id, bbox_hm, bbox_input, ann,
-    trans_output, calib):
+    self, ret, gt_det, cam, obj, cls_id, bbox_hm, bbox_input, ann, pred_cam):
 
     # Get size of bounding box
     h, w = bbox_hm[3] - bbox_hm[1], bbox_hm[2] - bbox_hm[0]
@@ -182,7 +195,7 @@ class WIBAM(GenericDataset):
     if h <= 0 or w <= 0:
       return
 
-    # Create a gaussian for the heat map for objects
+    # Create a gcamsaussian for the heat map for objects
     radius = gaussian_radius((math.ceil(h), math.ceil(w)))
     radius = max(0, int(radius))
 
@@ -192,26 +205,35 @@ class WIBAM(GenericDataset):
     ct_int = ct.astype(np.int32)
     
     # Input the category
-    ret['cat'][k] = cls_id - 1
+    ret['cat'][cam][obj] = cls_id - 1
+
     # Mask indicated that a valid object is at instance k in ret
-    ret['mask'][k] = 1
+    ret['mask'][cam][obj] = 1
 
-    # wh refers to width and height of bounding box
-    if 'wh' in ret:
-      ret['wh'][k] = 1. * w, 1. * h
-      ret['wh_mask'][k] = 1
-    
     # Add original bbox for loss
-    ret['bboxes'][k] = bbox_input
+    ret['bboxes'][cam][obj] = bbox_input
 
-    # Index of centre location
-    ret['ind'][k] = ct_int[1] * self.opt.output_w + ct_int[0]
-    # Offset of int and float (decimal part of centre)
-    ret['reg'][k] = ct - ct_int
-    # Mask indicating that a reg is present?
-    ret['reg_mask'][k] = 1
-    # Create heatmap
-    draw_umich_gaussian(ret['hm'][cls_id - 1], ct_int, radius)
+    ret['score'][cam][obj] = ann['score']
+
+    # If this camera number is the prediction camera generate heatmap etc
+    # Heatmap, index, etc from other cams not used in losses
+    if pred_cam:
+      # wh refers to width and height of bounding box
+      if 'wh' in ret:
+        ret['wh'][obj] = 1. * w, 1. * h
+        ret['wh_mask'][obj] = 1
+
+      # Index of centre location
+      ret['ind'][obj] = ct_int[1] * self.opt.output_w + ct_int[0]
+    
+      # Offset of int and float (decimal part of centre)
+      ret['reg'][obj] = ct - ct_int
+    
+      # Mask indicating that a reg is present?
+      ret['reg_mask'][obj] = 1
+    
+      # Create heatmap
+      draw_umich_gaussian(ret['hm'][cls_id - 1], ct_int, radius)
 
     # Put bbox into gt_boxes
     gt_det['bboxes'].append(
@@ -227,16 +249,27 @@ class WIBAM(GenericDataset):
     # Removed depth, rot, etc since they dont exist for this dataset
 
   # Initialise return before filling in
-  def _init_ret(self, ret, gt_det):
+  def _init_ret(self, ret, gt_det, num_cams):
     max_objs = self.max_objs * self.opt.dense_reg
+    # Heat maps
     ret['hm'] = np.zeros(
       (self.opt.num_classes, self.opt.output_h, self.opt.output_w), 
       np.float32)
+    
+    # Centre location index
     ret['ind'] = np.zeros((max_objs), dtype=np.int64)
-    ret['cat'] = np.zeros((max_objs), dtype=np.int64)
-    ret['mask'] = np.zeros((max_objs), dtype=np.float32)
+    
+    # Categories
+    ret['cat'] = np.zeros((num_cams, max_objs), dtype=np.int64)
+    
+    # Scores
+    ret['score'] = np.zeros((num_cams, max_objs), dtype=np.float32)
 
-    ret['bboxes'] = np.zeros((max_objs, 4), dtype=np.float32)
+    # Masks
+    ret['mask'] = np.zeros((num_cams, max_objs), dtype=np.float32)  
+
+    # Bounding boxes
+    ret['bboxes'] = np.zeros((num_cams, max_objs, 4), dtype=np.float32)
 
     regression_head_dims = {
       'reg': 2, 'wh': 2}
@@ -269,13 +302,17 @@ class WIBAM(GenericDataset):
       gt_det.update({'rot': []})
 
   # Get calibration information
-  def _get_calib(self, img_info):
-    calibration_info = {}
-    calibration_info["P"] = img_info['P']
-    calibration_info["dist_coefs"] = img_info['dist_coefs']
-    calibration_info["rvec"] = img_info['rvec']
-    calibration_info["tvec"] = img_info['tvec']
-    calibration_info["theta_X_d"] = img_info['theta_X_d']
+  def _get_calib(self, imgs_info):
+    all_calib_info = []
+    for img_info in imgs_info:
+      calibration_info = {}
+      calibration_info["P"] = img_info['P']
+      calibration_info["dist_coefs"] = img_info['dist_coefs']
+      calibration_info["rvec"] = img_info['rvec']
+      calibration_info["tvec"] = img_info['tvec']
+      calibration_info["theta_X_d"] = img_info['theta_X_d'] 
+      all_calib_info.append(calibration_info)
+    return all_calib_info
 
   # Loading data, use dataloader index to get image id
   # Function for loading single image with all annotations
@@ -284,9 +321,9 @@ class WIBAM(GenericDataset):
       id = self.instances[index]
     else:
       id = self.images[index]
-    img, anns, img_info, img_path = self._load_image_anns(id, self.coco, self.img_dir)
+    img, cams, anns, img_info, img_path = self._load_image_anns(id, self.coco, self.img_dir)
 
-    return img, anns, img_info, img_path
+    return img, cams, anns, img_info, img_path
 
   # Loads image annotations from file
   def _load_image_anns(self, id, coco, img_dir):
@@ -301,6 +338,7 @@ class WIBAM(GenericDataset):
     imgs_info = []
     imgs_path = []
     imgs_anns = []
+    cam_nums = []
     imgs = []
 
     # Need to decipher between loading all instances at a time and singular image
@@ -316,7 +354,6 @@ class WIBAM(GenericDataset):
       img_id = id + i
 
       img_info = coco.loadImgs(ids=[img_id])[0]
-      imgs_info.append(img_info)
 
       # Cam num is also = i if instance batching
       cam_num = img_info['cam']
@@ -326,6 +363,12 @@ class WIBAM(GenericDataset):
       img_path = os.path.join(img_dir, file_name)
       imgs_path.append(img_path)
 
+      # Load and append image
+      imgs.append(cv2.imread(img_path))
+      # Append corredsponding cam number
+      cam_nums.append(cam_num)
+
+
       # Load all annotations for that instance
       for j in range(num_cams):
         # Calculate the id number of the other camera images
@@ -333,25 +376,20 @@ class WIBAM(GenericDataset):
         # needs ID = 8 (ID=9 is cam 1). 
         # Therefore cam_ID = current_ID + index - cam
         ann_img_id = img_id + j - cam_num
+        img_info = coco.loadImgs(ids=[ann_img_id])[0]
 
         # Use coco utils to get annotation IDs for image instance
         ann_ids = coco.getAnnIds(imgIds=[ann_img_id])
         # Copy recursively all the annotations for that image
         anns = copy.deepcopy(coco.loadAnns(ids=ann_ids))
-        # Add this to the annotations for this camera
+        # Add this to the annotations and calibration for this camera
         imgs_anns.append(anns)
+        imgs_info.append(img_info)
 
-        # TODO: Add grabbing of calibration info for each camera
-
-      # Load and append image
-      imgs.append(cv2.imread(img_path))
+      
 
     # Return results
-    return imgs, imgs_anns, imgs_info, imgs_path
-
-  # # May need to rewrite flip annotations due to other camera annotations being wrong
-  # # TODO: Workout how it affects the system and calibrations, probably set all augmentation off initially
-  # def flip_anns():
+    return imgs, cam_nums, imgs_anns, imgs_info, imgs_path
 
   # Dataloader uses this function to create the iterable dataset
   def __len__(self):
