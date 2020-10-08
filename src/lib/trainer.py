@@ -17,6 +17,9 @@ from model.decode import generic_decode
 from model.utils import _sigmoid, flip_tensor, flip_lr_off, flip_lr
 from utils.debugger import Debugger
 from utils.post_process import generic_post_process
+from utils.mv_utils import cam2world
+
+
 
 class GenericLoss(torch.nn.Module):
   def __init__(self, opt):
@@ -90,8 +93,41 @@ class GenericLoss(torch.nn.Module):
     return losses['tot'], losses
 
 class MultiviewLoss(torch.nn.Module):
+  r"""
+  Class for calculating the multi-view losses for the WIBAM dataset
+  Arguments:
+      opt (dict): Configuration options
+  """
   def __init__(self, opt):
-    print("[ERROR] Not implemented")
+    super(GenericLoss, self).__init__()
+    self.crit = FastFocalLoss(opt=opt)
+    self.crit_reg = RegWeightedL1Loss()
+    self.opt = opt
+
+  def forward(self, outputs, batch):
+    r"""
+    Class for calculating the multi-view losses for the WIBAM dataset
+    Arguments:
+      outputs (dict): Output from the detection model on given batch
+      batch (dict): The input information for this batch
+    Returns:
+      losses (float): total loss
+      losses (list): list of individual losses
+    """
+    opt = self.opt
+    # reset all losses to zero
+    losses = {head: 0 for head in opt.heads}
+
+    # Stacks == 1 unless Hourglass == 2
+    for s in range(opt.num_stacks):
+      output = outputs[s]
+      output = self._sigmoid_output(output)
+
+      # Heatmap loss
+      if 'hm' in output:
+        losses['hm'] += self.crit(
+          output['hm'], batch['hm'], batch['ind'],
+          batch['mask'], batch['cat']) / opt.num_stacks
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
@@ -231,11 +267,16 @@ class Trainer(object):
     return ret, results
   
   def _get_losses(self, opt):
-    loss_order = ['hm', 'wh', 'reg', 'ltrb', 'hps', 'hm_hp', \
-      'hp_offset', 'dep', 'dim', 'rot', 'amodel_offset', \
-      'ltrb_amodal', 'tracking', 'nuscenes_att', 'velocity']
-    loss_states = ['tot'] + [k for k in loss_order if k in opt.heads]
-    loss = GenericLoss(opt)
+    if opt.dataset is 'wibam':
+      loss_order = ['hm', 'wh', 'reg', 'mv']
+      loss_states = ['tot'] + [i for i in loss_order if i in opt.heads]
+      loss = MultiviewLoss(opt)
+    else:
+      loss_order = ['hm', 'wh', 'reg', 'ltrb', 'hps', 'hm_hp', \
+        'hp_offset', 'dep', 'dim', 'rot', 'amodel_offset', \
+        'ltrb_amodal', 'tracking', 'nuscenes_att', 'velocity']
+      loss_states = ['tot'] + [k for k in loss_order if k in opt.heads]
+      loss = GenericLoss(opt)
     return loss_states, loss
 
   def debug(self, batch, output, iter_id, dataset):

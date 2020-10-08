@@ -252,6 +252,10 @@ class opts(object):
     self.parser.add_argument('--nuscenes_att_weight', type=float, default=1)
     self.parser.add_argument('--velocity', action='store_true')
     self.parser.add_argument('--velocity_weight', type=float, default=1)
+    
+    # Multi-view
+    self.parser.add_argument('--giou_thresh', type=float, default=-0.5,
+                            help='Threshold for compared GIoU')
 
     # custom dataset
     self.parser.add_argument('--custom_dataset_img_path', default='')
