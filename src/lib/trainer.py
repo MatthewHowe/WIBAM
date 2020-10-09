@@ -13,11 +13,12 @@ from utils.utils import AverageMeter
 
 from model.losses import FastFocalLoss, RegWeightedL1Loss
 from model.losses import BinRotLoss, WeightedBCELoss
+# from model.mv_losses import ReprojectionLoss
 from model.decode import generic_decode
 from model.utils import _sigmoid, flip_tensor, flip_lr_off, flip_lr
 from utils.debugger import Debugger
 from utils.post_process import generic_post_process
-from utils.mv_utils import cam2world
+from utils.mv_utils import cam_to_world
 
 
 
@@ -100,8 +101,9 @@ class MultiviewLoss(torch.nn.Module):
   """
   def __init__(self, opt):
     super(GenericLoss, self).__init__()
-    self.crit = FastFocalLoss(opt=opt)
-    self.crit_reg = RegWeightedL1Loss()
+    self.FastFocalLoss = FastFocalLoss(opt=opt)
+    self.RegWeightedL1Loss = RegWeightedL1Loss()
+    self.ReprojectionLoss = ReprojectionLoss()
     self.opt = opt
 
   def forward(self, outputs, batch):
@@ -125,9 +127,11 @@ class MultiviewLoss(torch.nn.Module):
 
       # Heatmap loss
       if 'hm' in output:
-        losses['hm'] += self.crit(
+        losses['hm'] += self.fast_focal_loss(
           output['hm'], batch['hm'], batch['ind'],
           batch['mask'], batch['cat']) / opt.num_stacks
+
+      mv_loss
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):

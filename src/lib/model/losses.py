@@ -63,7 +63,6 @@ def _neg_loss(pred, gt):
     loss = loss - (pos_loss + neg_loss) / num_pos
   return loss
 
-
 def _only_neg_loss(pred, gt):
   gt = torch.pow(1 - gt, 4)
   neg_loss = torch.log(1 - pred) * torch.pow(pred, 2) * gt
@@ -113,7 +112,6 @@ def _reg_loss(regr, gt_regr, mask):
   regr_loss = regr_loss / (num + 1e-4)
   return regr_loss
 
-
 class RegWeightedL1Loss(nn.Module):
   def __init__(self):
     super(RegWeightedL1Loss, self).__init__()
@@ -124,7 +122,6 @@ class RegWeightedL1Loss(nn.Module):
     loss = F.l1_loss(pred * mask, target * mask, reduction='sum')
     loss = loss / (mask.sum() + 1e-4)
     return loss
-
 
 class WeightedBCELoss(nn.Module):
   def __init__(self):
@@ -190,36 +187,3 @@ def compute_rot_loss(output, target_bin, target_res, mask):
           valid_output2[:, 7], torch.cos(valid_target_res2[:, 1]))
         loss_res += loss_sin2 + loss_cos2
     return loss_bin1 + loss_bin2 + loss_res
-
-def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
-    """
-    gt_bboxes: tensor (-1, 4) xyxy
-    pr_bboxes: tensor (-1, 4) xyxy
-    loss proposed in the paper of giou
-    """
-    gt_area = (gt_bboxes[:, 2]-gt_bboxes[:, 0])*(gt_bboxes[:, 3]-gt_bboxes[:, 1])
-    pr_area = (pr_bboxes[:, 2]-pr_bboxes[:, 0])*(pr_bboxes[:, 3]-pr_bboxes[:, 1])
-
-    # iou
-    lt = torch.max(gt_bboxes[:, :2], pr_bboxes[:, :2])
-    rb = torch.min(gt_bboxes[:, 2:], pr_bboxes[:, 2:])
-    TO_REMOVE = 1
-    wh = (rb - lt + TO_REMOVE).clamp(min=0)
-    inter = wh[:, 0] * wh[:, 1]
-    union = gt_area + pr_area - inter
-    iou = inter / union
-    # enclosure
-    lt = torch.min(gt_bboxes[:, :2], pr_bboxes[:, :2])
-    rb = torch.max(gt_bboxes[:, 2:], pr_bboxes[:, 2:])
-    wh = (rb - lt + TO_REMOVE).clamp(min=0)
-    enclosure = wh[:, 0] * wh[:, 1]
-
-    giou = iou - (enclosure-union)/enclosure
-    loss = 1. - giou
-    if reduction == 'mean':
-        loss = loss.mean()
-    elif reduction == 'sum':
-        loss = loss.sum()
-    elif reduction == 'none':
-        pass
-    return loss
