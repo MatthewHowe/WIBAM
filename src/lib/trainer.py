@@ -103,6 +103,15 @@ class MultiviewLoss(torch.nn.Module):
     self.ReprojectionLoss = ReprojectionLoss()
     self.opt = opt
 
+  def _sigmoid_output(self, output):
+    if 'hm' in output:
+      output['hm'] = _sigmoid(output['hm'])
+    if 'hm_hp' in output:
+      output['hm_hp'] = _sigmoid(output['hm_hp'])
+    if 'dep' in output:
+      output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
+    return output
+
   def forward(self, outputs, batch):
     r"""
     Class for calculating the multi-view losses for the WIBAM dataset
@@ -122,11 +131,19 @@ class MultiviewLoss(torch.nn.Module):
       output = outputs[s]
       output = self._sigmoid_output(output)
 
+      cat = torch.zeros((opt.batch_size,50),dtype=int).to(device=opt.device, non_blocking=True)
+      mask = torch.zeros((opt.batch_size,50),dtype=int).to(device=opt.device, non_blocking=True)
+
+      for i in range(len(batch['cam_num'])):
+        cat[i] = batch['cat'][i][batch['cam_num'][i]]
+        mask[i] = batch['mask'][i][batch['cam_num'][i]]
+
+      
       # Heatmap loss
       if 'hm' in output:
-        losses['hm'] += self.fast_focal_loss(
+        losses['hm'] += self.FastFocalLoss(
           output['hm'], batch['hm'], batch['ind'],
-          batch['mask'], batch['cat']) / opt.num_stacks
+          mask, cat) / opt.num_stacks
 
       mv_loss
 

@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
+from utils.mv_utils import dets_3D_wcf_to_dets_2D
 
 def _gather_feat(feat, ind):
   r"""

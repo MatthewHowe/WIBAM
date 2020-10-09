@@ -212,7 +212,7 @@ class WIBAM(GenericDataset):
     ct_int = ct.astype(np.int32)
     
     # Input the category
-    ret['cat'][cam][obj] = cls_id - 1
+    ret['cat'][cam][obj] = int(cls_id - 1)
 
     # Mask indicated that a valid object is at instance k in ret
     ret['mask'][cam][obj] = 1
