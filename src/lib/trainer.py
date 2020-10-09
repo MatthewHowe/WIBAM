@@ -124,7 +124,7 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    losses = {head: 0 for head in opt.heads}
+    losses = {}
 
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
@@ -145,7 +145,8 @@ class MultiviewLoss(torch.nn.Module):
           output['hm'], batch['hm'], batch['ind'],
           mask, cat) / opt.num_stacks
 
-      mv_loss
+      # Reprojection loss
+      losses['repro'] += self.ReprojectionLoss(output,batch)
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
