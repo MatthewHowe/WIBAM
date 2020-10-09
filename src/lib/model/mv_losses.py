@@ -1,6 +1,7 @@
 # File to contain functions for calculating multi view losses
 import torch
-from utils.mv_utils import 
+import torch.nn as nn
+from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
 
 def _gather_feat(feat, ind):
   r"""
@@ -92,8 +93,12 @@ class ReprojectionLoss(nn.Module):
     loss_tot (flaot): The total reprojection loss over all cameras
     losses (list): The component losses for each reprojected view
   """  
+  def __init__(self, opt=None):
+    super(ReprojectionLoss, self).__init__()
+
   def forward(self, output, batch):
     detections = {}
+    calibrations = {}
 
     # Get predictions in format (BN, objects, dim) for each of dep,rot,dim
     pred_dep = _tranpose_and_gather_feat(output['dep'], batch['ind'])
@@ -104,18 +109,28 @@ class ReprojectionLoss(nn.Module):
     detections['depth'] = pred_dep
     detections['size'] = pred_size
     detections['rot'] = pred_rot
-    detections['calib'] = batch['calib']
+    calibrations['P'] = batch['P']
+    calibrations['dist_coefs'] = batch['dist_coefs']
+    calibrations['tvec'] = batch['tvex']
+    calibrations['rvec'] = batch['rvec']
+    calibrations['theta_X_d'] = batch['theta_X_d']
 
     # Get predictions in camera.c.f loc(x,y,z), rot(alpha),dim(l,w,h)
-    detections = detection_to_3D(detections)
+    # Adds them to detections dict
+    det_cam_to_det_3D_ccf(detections,calibrations)
 
     # Put the predictions into world coordinate frame
+    # Adds them to detections dict
+    dets_3D_ccf_to_dets_3D_wcf(detections, calibrations)
 
-    # For each sample in the batch
-    for sample in len(range(batch['images'])):
-      # For each camera in the batch
-      for cam in len(range(batch['cams'])
-        # Reproject all objects onto camera view and get boxes, clipped
+    # Produce all the reprojections for every other camera
+    reprojections = dets_3D_wcf_to_dets_2D(detections, calibrations)
+
+    # # For each sample in the batch
+    # for sample in len(range(batch['images'])):
+    #   # For each camera in the batch
+    #   for cam in len(range(batch['cams'])
+    #     # Reproject all objects onto camera view and get boxes, clipped
 
 
         # Calculate GIoU from 2D bounding boxes and reprojections
@@ -125,6 +140,6 @@ class ReprojectionLoss(nn.Module):
     # loss = F.l1_loss(pred * mask, target * mask, reduction='elementwise_mean')
 
     # Sum all the losses from each camera
-    loss = 
+    loss = -1
     # loss = loss / (mask.sum() + 1e-4)
     return loss

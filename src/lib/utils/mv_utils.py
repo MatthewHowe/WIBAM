@@ -4,6 +4,98 @@ import numpy as np
 import shapely
 import cv2
 
+def det_cam_to_det_3D_ccf(model_detections, calib):
+  r"""
+  Detections from model are formatted with depth, size, rotation(8),
+  center location on the frame and must be converted to a location 
+  in camera coordinate frame, and rotation(1) in camera coordinate
+  frame. Function takes dictionary of detections from camera to 3D detections
+  in camera coordinate frame, adding them to the dict
+  Arguments:
+    model_detections (dict): list of dictionaries for detections from the 
+      model
+      format: [{center(2),depth(1),size(3),rot(8)}, ...]
+    calib (dict): dictionary of calibration information for camera
+      format: {P, dist_coefs, rvec, tvec, theta_X_d}
+  Returns:
+    camera_d etections (dict): list of dictionaries for detections in camera
+        coordinate frame.
+        format: [{loc(3), size(3), rot(1)}]
+  """
+  # Get locations of objects
+  unproject_2d_to_3d()
+
+  # Get rotation of objects
+  get_aplha()
+
+  return detections
+
+def dets_3D_ccf_to_dets_3D_wcf(dets_3D_ccf, calib):
+    r"""
+    Convert detections from camera coordinate frame to world coordinate
+    frame.
+    W.C.F: World coordinate frame
+    C.C.F: Camera coordinate frame
+    Arguments:
+        dets3Dc: 3D detections in the camera coordinate frame
+            format: [[loc,size,rot], ...]
+        calib (dict): dictionary of calibration information for camera detections
+            were performed on.
+            format: {P, dist_coefs, rvec, tvec, theta_X_d}
+    Returns:
+        dets3Dw: 3D detections 
+    """
+    # Initialise list to keep output
+    detections_3D_wcf = []
+    # Repeat process for each detection
+    for detection_3D_wcf in detections_3D_ccf:
+        # Apply translation for location
+        
+        # Convert detected angle from rad to degrees
+
+        # Apply rotation to the given angle (theta_x_d + rot_d)
+
+        # Append result to list
+        detections_3D_wcf.append()
+
+    return detections_3D_wcf
+
+def dets_3D_wcf_to_dets_2D(dets_3D_wcf, calib):
+  r"""
+  Reproject 3D detections in world coordinate frame to 2D bounding boxes
+  on the given calibrations, trimmed to fit onto frame.
+  W.C.F: World coordinate frame
+  C.C.F: Camera coordinate frame
+  Arguments:
+      dets_3D_wcf (np.array, float): list of 3D detections in world.c.f. [[loc,size,rot],...]
+      calib (dict): dictionary of calibration information for all cameras
+          {P, dist_coefs, rvec, tvec, theta_X_d}
+  Returns:
+      dets_2D (np.array, float): Detections in 3D on the given camera calibration
+          format: 
+  """
+  detections_2D = []
+
+  # Convert 3D detections to 3D bounding boxes
+  bounding_boxes_3D = det2bb3D(detections_3D_wcf)
+
+  # Repeat process for each detection
+  for bounding_box in bounding_boxes_3D:
+    # Project 3D bounding box points to camera frame points
+    img_pts = cv2.projectPoints(bounding_box, calib['rvec'], calib['tvec'], 
+                                calib['P'], calib['dist_coefs'])
+
+    # Find the minimum rectangle fit around the 3D bounding box
+    min_x = np.min(img_pts, axis=0)
+    min_y = np.min(img_pts, axis=1)
+    max_x = np.max(img_pts, axis=0)
+    max_y = np.max(img_pts, axis=1)
+
+    # Append result to list
+    detections_2D.append(np.array([min_x,min_y,max_x,max_y]))
+
+  return np.array(detections_2D)
+
 # Function to get rotation matrix fiven three rotations
 def get_rotation_matrix(rotations, degrees=True):
   r"""
@@ -43,73 +135,7 @@ def get_rotation_matrix(rotations, degrees=True):
   R = np.dot(R, Z)
   return R
 
-def reproject_3D_detection(detections_3D_wcf, calib):
-  r"""
-  Reproject 3D detections in world coordinate frame to 2D bounding boxes
-  on the given image, trimmed to fit onto frame.
-  W.C.F: World coordinate frame
-  C.C.F: Camera coordinate frame
-  Arguments:
-      dets3Dw (np.array, float): list of 3D detections in world.c.f. [[loc,size,rot],...]
-      calib (dict): dictionary of calibration information for camera
-          {P, dist_coefs, rvec, tvec, theta_X_d}
-  Returns:
-      dets2d (np.array, float): Detections in 3D on the given camera calibration
-          format: [[x_min,y_min,x_max,y_max], ...]
-  """
-  detections_2D = []
-
-  # Convert 3D detections to 3D bounding boxes
-  bounding_boxes_3D = det2bb3D(detections_3D_wcf)
-
-  # Repeat process for each detection
-  for bounding_box in bounding_boxes_3D:
-    # Project 3D bounding box points to camera frame points
-    img_pts = cv2.projectPoints(bounding_box, calib['rvec'], calib['tvec'], 
-                                calib['P'], calib['dist_coefs'])
-
-    # Find the minimum rectangle fit around the 3D bounding box
-    min_x = np.min(img_pts, axis=0)
-    min_y = np.min(img_pts, axis=1)
-    max_x = np.max(img_pts, axis=0)
-    max_y = np.max(img_pts, axis=1)
-
-    # Append result to list
-    detections_2D.append(np.array([min_x,min_y,max_x,max_y]))
-
-  return np.array(detections_2D)
-
-def cam_to_world(detections_3D_ccf, calib):
-    r"""
-    Convert detections from camera coordinate frame to world coordinate
-    frame.
-    W.C.F: World coordinate frame
-    C.C.F: Camera coordinate frame
-    Arguments:
-        dets3Dc: 3D detections in the camera coordinate frame
-            format: [[loc,size,rot], ...]
-        calib (dict): dictionary of calibration information for camera detections
-            were performed on.
-            format: {P, dist_coefs, rvec, tvec, theta_X_d}
-    Returns:
-        dets3Dw: 3D detections 
-    """
-    # Initialise list to keep output
-    detections_3D_wcf = []
-    # Repeat process for each detection
-    for detection_3D_wcf in detections_3D_ccf:
-        # Apply translation for location
-        
-        # Convert detected angle from rad to degrees
-
-        # Apply rotation to the given angle (theta_x_d + rot_d)
-
-        # Append result to list
-        detections_3D_wcf.append()
-
-    return detections_3D_wcf
-
-def detection_to_BBox_3D(detections_3D):
+def det_3D_to_BBox_3D(detections_3D):
   r"""
   Convert 3D detection to list of 8 x 3D points for bounding boxes
   Arguments:
@@ -153,31 +179,6 @@ def detection_to_BBox_3D(detections_3D):
     bounding_box_3D_list.append(bounding_box_3D_points)
 
   return np.array(bounding_box_3D_list)
-
-def detection_to_3D(model_detections, calib):
-  r"""
-  Detections from model are formatted with depth, size, rotation(8),
-  center location on the frame and must be converted to a location 
-  in camera coordinate frame, and rotation(1) in camera coordinate
-  frame.
-  Arguments:
-    model_detections (dict): list of dictionaries for detections from the 
-      model
-      format: [{center(2),depth(1),size(3),rot(8)}, ...]
-    calib (dict): dictionary of calibration information for camera
-      format: {P, dist_coefs, rvec, tvec, theta_X_d}
-  Returns:
-    camera_d etections (dict): list of dictionaries for detections in camera
-        coordinate frame.
-        format: [{loc(3), size(3), rot(1)}]
-  """
-  # Get locations of objects
-  unproject_2d_to_3d()
-
-  # Get rotation of objects
-  get_aplha()
-
-  return detections
 
 def unproject_2d_to_3d(center, depth, calib):
   r"""
