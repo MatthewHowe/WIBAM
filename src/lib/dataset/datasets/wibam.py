@@ -103,7 +103,14 @@ class WIBAM(GenericDataset):
       ret = {'image': inp}
       # Cam number for this image
       ret['cam_num'] = cam_num
-      ret['calib'] = self._get_calib(imgs_info)
+
+      # Get calibration information and put into np.arrays for collation
+      P, dist_coefs, rvec, tvec, theta_X_d = self._get_calib(imgs_info)
+      ret['P'] = np.array(P)
+      ret['dist_coefs'] = np.array(dist_coefs)
+      ret['rvec'] = np.array(rvec)
+      ret['tvec'] = np.array(tvec)
+      ret['theta_X_d'] = np.array(theta_X_d)
 
       # initialise gt dictionary
       gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
@@ -303,16 +310,19 @@ class WIBAM(GenericDataset):
 
   # Get calibration information
   def _get_calib(self, imgs_info):
-    all_calib_info = []
+    P = []
+    dist_coefs = []
+    rvec = []
+    tvec = []
+    theta_X_d = []
     for img_info in imgs_info:
       calibration_info = {}
-      calibration_info["P"] = img_info['P']
-      calibration_info["dist_coefs"] = img_info['dist_coefs']
-      calibration_info["rvec"] = img_info['rvec']
-      calibration_info["tvec"] = img_info['tvec']
-      calibration_info["theta_X_d"] = img_info['theta_X_d'] 
-      all_calib_info.append(calibration_info)
-    return all_calib_info
+      P.append(img_info['P'])
+      dist_coefs.append(img_info['dist_coefs'])
+      rvec.append(img_info['rvec'])
+      tvec.append(img_info['tvec'])
+      theta_X_d.append(img_info['theta_X_d'])
+    return P, dist_coefs, rvec, tvec, theta_X_d
 
   # Loading data, use dataloader index to get image id
   # Function for loading single image with all annotations
