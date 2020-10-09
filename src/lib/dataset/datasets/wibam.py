@@ -58,7 +58,7 @@ class WIBAM(GenericDataset):
       self.num_samples = len(self.images)
 
     print('[INFO] Loaded {} split with {} images and {} instances'.format( \
-          split, self.images, self.instances))
+          split, len(self.images), len(self.instances)))
     print("[INFO] Loading with instance_batching: {} in {} samples".format( \
           self.opt.instance_batching, self.num_samples))
 
