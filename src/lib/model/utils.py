@@ -68,6 +68,7 @@ def _topk_channel(scores, K=100):
 
   return topk_scores, topk_inds, topk_ys, topk_xs
 
+# Finds top 100 objects on heatmap
 def _topk(scores, K=100):
   batch, cat, height, width = scores.size()
     

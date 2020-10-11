@@ -2,43 +2,10 @@
 import torch
 import torch.nn as nn
 from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
-from utils.mv_utils import dets_3D_wcf_to_dets_2D
+from utils.mv_utils import dets_3D_wcf_to_dets_2D, decode_output
+from utils.mv_utils import _gather_feat, _tranpose_and_gather_feat
 
-def _gather_feat(feat, ind):
-  r"""
-  Composes a tensor from the variable prediction heatmap and the indexes from the 
-  ground truth data.
-  Arguments:
-    feat (tensor, (BN,hm_x*hm_y,dim)): predictions for variable for each point 
-      on the output heatmap that has been permuted
-    ind (tensor, (BN, max_objects, dim)): indexes for the location for each 
-      object
-  Returns:
-    feat (tensor, (BN,max_objects,dim)): the depth prediction at each gt heat map
-      index
-  """
-  dim = feat.size(2)
-  ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
-  feat = feat.gather(1, ind)
-  return feat
 
-def _tranpose_and_gather_feat(feat, ind):
-  r"""
-  Composes the prediction data from a heat map size tensor that contains predictions
-  to an output which is peridctions of max_object size for each dimension
-  Arguments:
-    feat (tensor, (BN,dim,hm_x,hm_y)): predictions for variable for each point 
-      on the output heatmap
-    ind (tensor, (BN, max_objects, dim)): indexes for the location for each 
-      object
-  Returns:
-    feat (tensor, (BN,max_objects,dim)): the depth prediction at each gt heat map
-      index
-  """
-  feat = feat.permute(0, 2, 3, 1).contiguous()
-  feat = feat.view(feat.size(0), -1, feat.size(3))
-  feat = _gather_feat(feat, ind)
-  return feat
 
 def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   r"""
@@ -106,13 +73,18 @@ class ReprojectionLoss(nn.Module):
     pred_size = _tranpose_and_gather_feat(output['dim'], batch['ind'])
     pred_rot = _tranpose_and_gather_feat(output['rot'], batch['ind'])
 
+    decoded_output = decode_output(output, pred_dep.shape[1])
+
     # Put detections into their own dictionary with required information
+    # detections['centers'] = 
     detections['depth'] = pred_dep
     detections['size'] = pred_size
     detections['rot'] = pred_rot
+    detections['center'] = decoded_output['centers']
+    calibrations['cam_num'] = batch['cam_num']
     calibrations['P'] = batch['P']
     calibrations['dist_coefs'] = batch['dist_coefs']
-    calibrations['tvec'] = batch['tvex']
+    calibrations['tvec'] = batch['tvec']
     calibrations['rvec'] = batch['rvec']
     calibrations['theta_X_d'] = batch['theta_X_d']
 

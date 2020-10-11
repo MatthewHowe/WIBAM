@@ -124,7 +124,7 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    losses = {}
+    losses = {'hm':0,'repro':0}
 
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):

@@ -1,6 +1,8 @@
 # Multi-view utilities file
 
 import numpy as np
+import torch.nn as nn
+import torch
 import shapely
 import cv2
 
@@ -23,12 +25,15 @@ def det_cam_to_det_3D_ccf(model_detections, calib):
         format: [{loc(3), size(3), rot(1)}]
   """
   # Get locations of objects
-  unproject_2d_to_3d()
+  locations = unproject_2d_to_3d(model_detections['center'], model_detections['depth'], calib)
 
   # Get rotation of objects
-  get_aplha()
+  alphas = get_alpha(model_detections['rot'])
 
-  return detections
+  model_detections['alpha'] = alphas
+  model_detections['location'] = locations
+
+  return model_detections
 
 def dets_3D_ccf_to_dets_3D_wcf(dets_3D_ccf, calib):
     r"""
@@ -196,16 +201,28 @@ def unproject_2d_to_3d(center, depth, calib):
       coordinate frame
       format: (x,y,z)
   """
+  locations = torch.zeros((center.shape[0], 3, center.shape[1]))
 
-  # Get Rotation|translation matrix (3x4)
-  R_t = cv2.composeRT(calib['rvec'], calib['tvec'])
+  for batch in range(center.shape[0]):
+    camera_number = int(calib['cam_num'][batch])
+    rvec = calib['rvec'][batch][camera_number].cpu().numpy()
 
-  z = depth - R_t[2, 3]
-  x = (center[0] * depth - R_t[0, 3] - R_t[0, 2] * z) / R_t[0, 0]
-  y = (center[1] * depth - R_t[1, 3] - R_t[1, 2] * z) / R_t[1, 1]
-  location_3D = np.array([x, y, z], dtype=np.float32).reshape(3)
-  return location_3D
+    P = calib['P'][batch][camera_number]
 
+    u = center[batch,:,0]
+    v = center[batch,:,1]
+
+    z = (depth[batch].reshape((50)))
+    x = ((u * z) / P[0, 0])
+    y = ((v * z) / P[1, 1])
+
+    locations[batch][0] = x
+    locations[batch][1] = y 
+    locations[batch][2] = z
+  
+  locations = locations.permute(0, 2, 1).contiguous()
+  return locations.permute(0, 2, 1).contiguous()
+  
 def get_alpha(bin_rotation):
   r"""
   Gets the multi-bin output and converts to a single angle alpha. CenterNet
@@ -224,3 +241,92 @@ def get_alpha(bin_rotation):
 
   # Return only the predicted bin
   return alpha_bin1 * bin_index + alpha_bin2 * (1 - bin_index)
+
+def _gather_feat(feat, ind):
+  r"""
+  Composes a tensor from the variable prediction heatmap and the indexes from the 
+  ground truth data.
+  Arguments:
+    feat (tensor, (BN,hm_x*hm_y,dim)): predictions for variable for each point 
+      on the output heatmap that has been permuted
+    ind (tensor, (BN, max_objects, dim)): indexes for the location for each 
+      object
+  Returns:
+    feat (tensor, (BN,max_objects,dim)): the depth prediction at each gt heat map
+      index
+  """
+  dim = feat.size(2)
+  ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
+  feat = feat.gather(1, ind)
+  return feat
+
+def _tranpose_and_gather_feat(feat, ind):
+  r"""
+  Composes the prediction data from a heat map size tensor that contains predictions
+  to an output which is peridctions of max_object size for each dimension
+  Arguments:
+    feat (tensor, (BN,dim,hm_x,hm_y)): predictions for variable for each point 
+      on the output heatmap
+    ind (tensor, (BN, max_objects, dim)): indexes for the location for each 
+      object
+  Returns:
+    feat (tensor, (BN,max_objects,dim)): the depth prediction at each gt heat map
+      index
+  """
+  feat = feat.permute(0, 2, 3, 1).contiguous()
+  feat = feat.view(feat.size(0), -1, feat.size(3))
+  feat = _gather_feat(feat, ind)
+  return feat
+
+def _nms(heat, kernel=3):
+  pad = (kernel - 1) // 2
+
+  hmax = nn.functional.max_pool2d(
+      heat, (kernel, kernel), stride=1, padding=pad)
+  keep = (hmax == heat).float()
+  return heat * keep
+
+def _topk_channel(scores, K=100):
+  batch, cat, height, width = scores.size()
+  
+  topk_scores, topk_inds = torch.topk(scores.view(batch, cat, -1), K)
+
+  topk_inds = topk_inds % (height * width)
+  topk_ys   = (topk_inds / width).int().float()
+  topk_xs   = (topk_inds % width).int().float()
+
+  return topk_scores, topk_inds, topk_ys, topk_xs
+
+# Finds top 100 objects on heatmap
+def _topk(scores, K=100):
+  batch, cat, height, width = scores.size()
+    
+  topk_scores, topk_inds = torch.topk(scores.view(batch, cat, -1), K)
+
+  topk_inds = topk_inds % (height * width)
+  topk_ys   = (topk_inds / width).int().float()
+  topk_xs   = (topk_inds % width).int().float()
+    
+  topk_score, topk_ind = torch.topk(topk_scores.view(batch, -1), K)
+  topk_clses = (topk_ind / K).int()
+  topk_inds = _gather_feat(
+      topk_inds.view(batch, -1, 1), topk_ind).view(batch, K)
+  topk_ys = _gather_feat(topk_ys.view(batch, -1, 1), topk_ind).view(batch, K)
+  topk_xs = _gather_feat(topk_xs.view(batch, -1, 1), topk_ind).view(batch, K)
+
+  return topk_score, topk_inds, topk_clses, topk_ys, topk_xs
+
+def decode_output(output, K=100, opt=None):
+  heat = output['hm']
+  batch, cat, height, width = heat.size()
+  heat = _nms(heat)
+  scores, inds, clses, ys0, xs0 = _topk(heat, K=K)
+
+  clses  = clses.view(batch, K)
+  scores = scores.view(batch, K)
+  bboxes = None
+  cts = torch.cat([xs0.unsqueeze(2), ys0.unsqueeze(2)], dim=2)
+  ret = {'scores': scores, 'clses': clses.float(), 
+         'xs': xs0, 'ys': ys0, 'centers': cts}
+
+  return ret
