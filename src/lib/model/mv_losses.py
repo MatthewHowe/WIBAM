@@ -88,7 +88,7 @@ class ReprojectionLoss(nn.Module):
     calibrations['rvec'] = batch['rvec']
     calibrations['theta_X_d'] = batch['theta_X_d']
 
-    # Get predictions in camera.c.f loc(x,y,z), rot(alpha),dim(l,w,h)
+    # Get predictions in camera.c.f loc(x,y,z), rot(alpha),size(l,w,h)
     # Adds them to detections dict
     det_cam_to_det_3D_ccf(detections,calibrations)
 

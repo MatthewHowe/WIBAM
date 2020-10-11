@@ -3,6 +3,7 @@
 import numpy as np
 import torch.nn as nn
 import torch
+import math
 import shapely
 import cv2
 
@@ -25,7 +26,9 @@ def det_cam_to_det_3D_ccf(model_detections, calib):
         format: [{loc(3), size(3), rot(1)}]
   """
   # Get locations of objects
-  locations = unproject_2d_to_3d(model_detections['center'], model_detections['depth'], calib)
+  locations = unproject_2d_to_3d(model_detections['center'], 
+                                 model_detections['depth'], 
+                                 calib)
 
   # Get rotation of objects
   alphas = get_alpha(model_detections['rot'])
@@ -51,17 +54,20 @@ def dets_3D_ccf_to_dets_3D_wcf(dets_3D_ccf, calib):
         dets3Dw: 3D detections 
     """
     # Initialise list to keep output
-    detections_3D_wcf = []
+    BN, objs, dims = dets_3D_ccf['location'].shape
+    locations_wcf = torch.zeros((BN, objs, 3)).to(device="cuda")
+    alphas_wcf = torch.zeros((BN, objs)).to(device="cuda")
     # Repeat process for each detection
-    for detection_3D_wcf in detections_3D_ccf:
+    for det_3D_ccf in dets_3D_ccf:
         # Apply translation for location
+        
         
         # Convert detected angle from rad to degrees
 
         # Apply rotation to the given angle (theta_x_d + rot_d)
 
         # Append result to list
-        detections_3D_wcf.append()
+        
 
     return detections_3D_wcf
 
@@ -219,8 +225,7 @@ def unproject_2d_to_3d(center, depth, calib):
     locations[batch][0] = x
     locations[batch][1] = y 
     locations[batch][2] = z
-  
-  locations = locations.permute(0, 2, 1).contiguous()
+
   return locations.permute(0, 2, 1).contiguous()
   
 def get_alpha(bin_rotation):
@@ -235,12 +240,15 @@ def get_alpha(bin_rotation):
     alpha (float): angle in radians of vehicle relative to camera
   """
   # True if bin1, else bin2
-  bin_index = bin_rotation[:, 1] > bin_rotation[:, 5]
-  alpha_bin1 = np.arctan2(bin_rotation[:, 2], bin_rotation[:, 3]) + (-0.5 * np.pi)
-  alpha_bin2 = np.arctan2(bin_rotation[:, 6], bin_rotation[:, 7]) + ( 0.5 * np.pi)
+  bin_index = bin_rotation[:, :, 1] > bin_rotation[:, :, 5]
 
-  # Return only the predicted bin
-  return alpha_bin1 * bin_index + alpha_bin2 * (1 - bin_index)
+  pi =  torch.Tensor([math.pi]).to(device="cuda")
+
+  alpha_bin1 = torch.atan2(bin_rotation[:, :, 2], bin_rotation[:, :, 3]) + (-0.5 * pi)
+  alpha_bin2 = torch.atan2(bin_rotation[:, :, 6], bin_rotation[:, :, 7]) + ( 0.5 * pi)
+
+  # Return only the predicted bin ~ inverts mask
+  return alpha_bin1 * bin_index + alpha_bin2 * (~bin_index)
 
 def _gather_feat(feat, ind):
   r"""
