@@ -7,6 +7,9 @@ import math
 import shapely
 import cv2
 
+def draw_detections(batch, model_detections, calib):
+
+
 def det_cam_to_det_3D_ccf(model_detections, calib):
   r"""
   Detections from model are formatted with depth, size, rotation(8),
@@ -38,38 +41,53 @@ def det_cam_to_det_3D_ccf(model_detections, calib):
 
   return model_detections
 
-def dets_3D_ccf_to_dets_3D_wcf(dets_3D_ccf, calib):
-    r"""
-    Convert detections from camera coordinate frame to world coordinate
-    frame.
-    W.C.F: World coordinate frame
-    C.C.F: Camera coordinate frame
-    Arguments:
-        dets3Dc: 3D detections in the camera coordinate frame
-            format: [[loc,size,rot], ...]
-        calib (dict): dictionary of calibration information for camera detections
-            were performed on.
-            format: {P, dist_coefs, rvec, tvec, theta_X_d}
-    Returns:
-        dets3Dw: 3D detections 
-    """
-    # Initialise list to keep output
-    BN, objs, dims = dets_3D_ccf['location'].shape
-    locations_wcf = torch.zeros((BN, objs, 3)).to(device="cuda")
-    alphas_wcf = torch.zeros((BN, objs)).to(device="cuda")
-    # Repeat process for each detection
-    for det_3D_ccf in dets_3D_ccf:
-        # Apply translation for location
-        
-        
-        # Convert detected angle from rad to degrees
+def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
+  r"""
+  Convert detections from camera coordinate frame to world coordinate
+  frame.
+  W.C.F: World coordinate frame
+  C.C.F: Camera coordinate frame
+  Arguments:
+      dets3Dc: 3D detections in the camera coordinate frame
+          format: [[loc,size,rot], ...]
+      calib (dict): dictionary of calibration information for camera detections
+          were performed on.
+          format: {P, dist_coefs, rvec, tvec, theta_X_d}
+  Returns:
+      dets3Dw: 3D detections 
+  """
+  # Initialise list to keep output
+  BN, objs, dims = detections['location'].shape
+  locations_wcf = torch.zeros((BN, objs, 3)).to(device="cuda")
+  alphas_wcf = torch.zeros((BN, objs)).to(device="cuda")
 
-        # Apply rotation to the given angle (theta_x_d + rot_d)
+  # Repeat process for each detection
+  for batch in range(BN):
+    cam_num = calib['cam_num'][batch]
 
-        # Append result to list
-        
+    # Translation from camera to world origin .in c.c.f.
+    tvec = calib['tvec'][batch,cam_num]
+    rvec = calib['rvec'][batch,cam_num]
+    theta = calib['theta_X_d'][batch,cam_num]
+    # Calibration rotation is from world to camera, inv needed
+    R_cw = np.linalg.inv(cv2.Rodrigues(rvec.cpu().numpy())[0])
+    R_cw = torch.Tensor(R_cw).to(device="cuda")
 
-    return detections_3D_wcf
+    for obj in range(objs):
+      loc_ccf = detections['location'][batch][obj].reshape((3,1))
+      loc_wcf = torch.sub(loc_ccf, tvec).float()
+      locations_wcf[batch,obj] = torch.mm(R_cw,loc_wcf).reshape((3))
+
+      # Convert detected angle from rad to degrees
+      alpha_ccf = detections['alpha'][batch][obj] * 180/math.pi
+      alpha_wcf = alpha_ccf + theta
+
+      # Apply rotation to the given angle (theta_x_d + rot_d)
+
+      # Append result to list
+      
+  detections['location_wcf'] = locations_wcf
+  return detections
 
 def dets_3D_wcf_to_dets_2D(dets_3D_wcf, calib):
   r"""
@@ -226,7 +244,7 @@ def unproject_2d_to_3d(center, depth, calib):
     locations[batch][1] = y 
     locations[batch][2] = z
 
-  return locations.permute(0, 2, 1).contiguous()
+  return locations.permute(0, 2, 1).contiguous().to(device='cuda')
   
 def get_alpha(bin_rotation):
   r"""

@@ -4,7 +4,7 @@ import torch.nn as nn
 from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
 from utils.mv_utils import dets_3D_wcf_to_dets_2D, decode_output
 from utils.mv_utils import _gather_feat, _tranpose_and_gather_feat
-
+from utils.mv_utils import draw_detections
 
 
 def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
@@ -97,7 +97,7 @@ class ReprojectionLoss(nn.Module):
     dets_3D_ccf_to_dets_3D_wcf(detections, calibrations)
 
     # Produce all the reprojections for every other camera
-    reprojections = dets_3D_wcf_to_dets_2D(detections, calibrations)
+    dets_3D_wcf_to_dets_2D(detections, calibrations)
 
     # # For each sample in the batch
     # for sample in len(range(batch['images'])):
