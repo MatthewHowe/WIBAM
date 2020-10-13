@@ -4,7 +4,7 @@ import torch.nn as nn
 from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
 from utils.mv_utils import dets_3D_wcf_to_dets_2D, decode_output
 from utils.mv_utils import _gather_feat, _tranpose_and_gather_feat
-from utils.mv_utils import draw_detections
+from utils.mv_utils import draw_detections, test_calculations
 
 
 def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
@@ -80,13 +80,15 @@ class ReprojectionLoss(nn.Module):
     detections['depth'] = pred_dep
     detections['size'] = pred_size
     detections['rot'] = pred_rot
-    detections['center'] = decoded_output['centers']
+    detections['center'] = decoded_output['centers'] * 4
     calibrations['cam_num'] = batch['cam_num']
     calibrations['P'] = batch['P']
     calibrations['dist_coefs'] = batch['dist_coefs']
     calibrations['tvec'] = batch['tvec']
     calibrations['rvec'] = batch['rvec']
     calibrations['theta_X_d'] = batch['theta_X_d']
+
+    test_calculations(batch, calibrations)
 
     # Get predictions in camera.c.f loc(x,y,z), rot(alpha),size(l,w,h)
     # Adds them to detections dict

@@ -7,8 +7,40 @@ import math
 import shapely
 import cv2
 
-def draw_detections(batch, model_detections, calib):
+def test_calculations(batch, calib):
+  location_wcf = np.array([10,10,1.25]).reshape((3,1))
 
+  # Get calibration information
+  rvec = calib['rvec'][0][0].cpu().numpy()
+  R = cv2.Rodrigues(rvec)[0]
+  tvec = calib['tvec'][0][0].cpu().numpy()
+  P = calib['P'][0][0].cpu().numpy()
+  dist_coefs = calib['dist_coefs'][0][0].cpu().numpy()
+
+  center = cv2.projectPoints(location_wcf.reshape((1,1,3)), rvec, tvec,
+                             P, dist_coefs)[0]
+
+  z = (np.dot(R, location_wcf) + tvec)[2]
+
+  z = torch.Tensor([[z]])
+  center = torch.Tensor(center)
+
+  locations = unproject_2d_to_3d(center, z, calib)
+
+  print(locations)
+
+  detections = {"location": locations, "alpha": torch.Tensor([[0]])}
+
+  detections = dets_3D_ccf_to_dets_3D_wcf(detections, calib)
+  reprojected = detections['location_wcf'][0][0].cpu().numpy()
+  difference = reprojected - location_wcf.reshape((3))
+
+  if np.max(difference) > 1:
+    print("[WARNING] Large error in reprojections, check calculations")
+
+def draw_detections(batch, model_detections, calib):
+  
+  print("[ERROR] Not implemented")
 
 def det_cam_to_det_3D_ccf(model_detections, calib):
   r"""
@@ -74,25 +106,23 @@ def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
     R_cw = torch.Tensor(R_cw).to(device="cuda")
 
     for obj in range(objs):
+      # Convert detected location from ccf to wcf
       loc_ccf = detections['location'][batch][obj].reshape((3,1))
       loc_wcf = torch.sub(loc_ccf, tvec).float()
       locations_wcf[batch,obj] = torch.mm(R_cw,loc_wcf).reshape((3))
 
       # Convert detected angle from rad to degrees
       alpha_ccf = detections['alpha'][batch][obj] * 180/math.pi
-      alpha_wcf = alpha_ccf + theta
+      alphas_wcf[batch, obj] = alpha_ccf + theta
 
-      # Apply rotation to the given angle (theta_x_d + rot_d)
-
-      # Append result to list
-      
   detections['location_wcf'] = locations_wcf
+  detections['alpha_wcf'] = alphas_wcf
   return detections
 
-def dets_3D_wcf_to_dets_2D(dets_3D_wcf, calib):
+def dets_3D_wcf_to_dets_2D(detections, calib):
   r"""
   Reproject 3D detections in world coordinate frame to 2D bounding boxes
-  on the given calibrations, trimmed to fit onto frame.
+  on all other cameras, trimmed to fit onto frame.
   W.C.F: World coordinate frame
   C.C.F: Camera coordinate frame
   Arguments:
@@ -103,27 +133,44 @@ def dets_3D_wcf_to_dets_2D(dets_3D_wcf, calib):
       dets_2D (np.array, float): Detections in 3D on the given camera calibration
           format: 
   """
-  detections_2D = []
+  BN, objs, dims = detections['location_wcf'].shape
+  num_cams = calib['P'].shape[1]
+  detections_2D = torch.zeros((BN, num_cams, objs, 4))
 
   # Convert 3D detections to 3D bounding boxes
-  bounding_boxes_3D = det2bb3D(detections_3D_wcf)
+  detections = det_3D_to_BBox_3D(detections)
 
   # Repeat process for each detection
-  for bounding_box in bounding_boxes_3D:
-    # Project 3D bounding box points to camera frame points
-    img_pts = cv2.projectPoints(bounding_box, calib['rvec'], calib['tvec'], 
-                                calib['P'], calib['dist_coefs'])
+  for batch in range(BN):
+    for cam in range(num_cams):
+      for obj in range(objs):
+        # Project 3D bounding box points to camera frame points
+        bounding_box_wcf = detections['3D_bounding_boxes'][batch][obj]
+        P = calib['P'][batch][cam]
+        rvec = calib['rvec'][batch][cam]
+        R_wc = cv2.Rodrigues(rvec.cpu().numpy())[0]
+        R_wc = torch.Tensor(R_wc).to(device="cuda")
+        tvec = calib['tvec'][batch][cam]
 
-    # Find the minimum rectangle fit around the 3D bounding box
-    min_x = np.min(img_pts, axis=0)
-    min_y = np.min(img_pts, axis=1)
-    max_x = np.max(img_pts, axis=0)
-    max_y = np.max(img_pts, axis=1)
+        bounding_box_wcf = bounding_box_wcf.transpose(0,1)
+        bounding_box_ccf = torch.add(torch.mm(R_wc, bounding_box_wcf), tvec)
 
-    # Append result to list
-    detections_2D.append(np.array([min_x,min_y,max_x,max_y]))
+        bounding_box_cam = torch.mm(P, bounding_box_ccf)
 
-  return np.array(detections_2D)
+        bounding_box_cam = torch.div(bounding_box_cam,bounding_box_cam[2])
+
+        bounding_box_cam = bounding_box_cam[:2].transpose(0,1)
+
+        # Find the minimum rectangle fit around the 3D bounding box
+        min_x, min_y = torch.min(bounding_box_cam, axis=0)[0]
+        max_x, max_y = torch.max(bounding_box_cam, axis=0)[0]
+
+        # Append result to list
+        detections_2D[batch][cam][obj] = torch.Tensor([min_x,min_y,max_x,max_y])
+
+  detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
+
+  return detections
 
 # Function to get rotation matrix fiven three rotations
 def get_rotation_matrix(rotations, degrees=True):
@@ -160,11 +207,11 @@ def get_rotation_matrix(rotations, degrees=True):
     [0,0,1]
   ])
 
-  R = np.dot(X, Y)
-  R = np.dot(R, Z)
+  R = np.dot(X_rotation, Y_rotation)
+  R = np.dot(R, Z_rotation)
   return R
 
-def det_3D_to_BBox_3D(detections_3D):
+def det_3D_to_BBox_3D(detections):
   r"""
   Convert 3D detection to list of 8 x 3D points for bounding boxes
   Arguments:
@@ -177,37 +224,43 @@ def det_3D_to_BBox_3D(detections_3D):
       right to left
       format: [[btm_fr,btm_fl,btm_rr,btm_rl,top_fr, ...], ...]
   """
-  bounding_box_3D_list = []
+  BN, objs, dim = detections['location_wcf'].shape
+  bounding_box_3D = torch.zeros((BN, objs, 8, 3))
 
-  for detection in detections_3D:
-    l, w, h = detection[1]
+  for batch in range(BN):
+    for obj in range(objs):
+      l, w, h = detections['size'][batch,obj]
+      alpha = detections['alpha'][batch,obj]
+      loc = detections['location_wcf'][batch,obj].reshape((3,1)).cpu()
 
-    # Get rotation around Z axis
-    rotation_matrix = get_rotation_matrix(np.array([0,0,rot]), detection[2])
+      # Get rotation around Z axis
+      rotation_matrix = get_rotation_matrix(np.array([0,0,alpha]))
+      rotation_matrix = torch.Tensor(rotation_matrix)
 
-    # Get bounding box points
-    bounding_box_3D_points = np.array([
-      [l/2,-w/2,0],
-      [l/2,w/2,0],
-      [-l/2,-w/2,0],
-      [-l/2,w/2,0],
-      [l/2,-w/2,h],
-      [l/2,w/2,h],
-      [-l/2,-w/2,h],
-      [-l/2,w/2,h],
-    ])
+      # Get bounding box points
+      bounding_box_3D_points = torch.Tensor([
+        [l/2,-w/2,0],
+        [l/2,w/2,0],
+        [-l/2,-w/2,0],
+        [-l/2,w/2,0],
+        [l/2,-w/2,h],
+        [l/2,w/2,h],
+        [-l/2,-w/2,h],
+        [-l/2,w/2,h],
+      ]).transpose(0,1)
 
-    # Rotate bounding box
-    for point_idx in range(len(bounding_box_3D_points)):
-      bounding_box_3D_points[point_idx] = np.dot(rotation_matrix, bounding_box_3D_points[point_idx])
+      # Rotate bounding box
+      bounding_box_3D_points = torch.mm(rotation_matrix, bounding_box_3D_points)
 
-    # Translate bounding box
-    bounding_box_3D_points = np.add(bounding_box_3D_points, detection[0])
+      # Translate bounding box
+      bounding_box_3D_points = torch.add(bounding_box_3D_points, loc)
 
-    # Append to return variable
-    bounding_box_3D_list.append(bounding_box_3D_points)
+      # Append to return variable
+      bounding_box_3D[batch,obj] = torch.transpose(bounding_box_3D_points, 0, 1)
 
-  return np.array(bounding_box_3D_list)
+    detections['3D_bounding_boxes'] = bounding_box_3D.to(device='cuda')
+
+    return detections
 
 def unproject_2d_to_3d(center, depth, calib):
   r"""
@@ -236,9 +289,9 @@ def unproject_2d_to_3d(center, depth, calib):
     u = center[batch,:,0]
     v = center[batch,:,1]
 
-    z = (depth[batch].reshape((50)))
-    x = ((u * z) / P[0, 0])
-    y = ((v * z) / P[1, 1])
+    z = (depth[batch].reshape((center.shape[1])))
+    x = (((u - P[0, 2]) * z) / P[0, 0])
+    y = (((v - P[1, 2]) * z) / P[1, 1])
 
     locations[batch][0] = x
     locations[batch][1] = y 
