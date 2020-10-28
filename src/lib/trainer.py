@@ -124,7 +124,7 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    losses = {'hm':0,'repro':0}
+    losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
 
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
@@ -138,7 +138,14 @@ class MultiviewLoss(torch.nn.Module):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]
         mask[i] = batch['mask'][i][batch['cam_num'][i]]
 
-      
+      regression_heads = ['reg', 'wh']
+
+      for head in regression_heads:
+        if head in output:
+          losses[head] += self.RegWeightedL1Loss(
+            output[head], batch[head + '_mask'],
+            batch['ind'], batch[head]) / opt.num_stacks
+
       # Heatmap loss
       if 'hm' in output:
         losses['hm'] += self.FastFocalLoss(
@@ -146,7 +153,11 @@ class MultiviewLoss(torch.nn.Module):
           mask, cat) / opt.num_stacks
 
       # Reprojection loss
-      losses['repro'] += self.ReprojectionLoss(output,batch)
+      losses['mv'] += self.ReprojectionLoss(output,batch)
+      for key, val in losses.items():
+        if key != 'tot':
+          losses['tot'] += val
+      return losses['tot'], losses
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
@@ -198,8 +209,7 @@ class Trainer(object):
     opt = self.opt
     results = {}
     data_time, batch_time = AverageMeter(), AverageMeter()
-    avg_loss_stats = {l: AverageMeter() for l in self.loss_stats \
-                      if l == 'tot' or opt.weights[l] > 0}
+    avg_loss_stats = {l: AverageMeter() for l in self.loss_stats}
     num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters
     bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
     end = time.time()
@@ -245,7 +255,7 @@ class Trainer(object):
         total=bar.elapsed_td, eta=bar.eta_td)
 
       # Logging step
-      for l in avg_loss_stats:
+      for l in loss_stats:
         avg_loss_stats[l].update(
           loss_stats[l].mean().item(), batch['image'].size(0)
         )
@@ -287,8 +297,8 @@ class Trainer(object):
   
   def _get_losses(self, opt):
     if opt.dataset == "wibam":
-      loss_order = ['hm', 'wh', 'reg', 'mv']
-      loss_states = ['tot'] + [i for i in loss_order if i in opt.heads]
+      loss_order = ['hm', 'wh', 'reg']
+      loss_states = ['tot','mv'] + [i for i in loss_order if i in opt.heads]
       loss = MultiviewLoss(opt)
     else:
       loss_order = ['hm', 'wh', 'reg', 'ltrb', 'hps', 'hm_hp', \

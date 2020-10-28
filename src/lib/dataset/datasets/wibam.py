@@ -154,7 +154,7 @@ class WIBAM(GenericDataset):
           # Add information to ret
           # GT_det dict is used for debugging
           self._add_instance(
-            ret, gt_det, cam, obj, cls_id, bbox, bbox_amodal, ann, pred_cam)
+            ret, gt_det, cam, obj, cls_id, bbox, ann['bbox'], ann, pred_cam)
 
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)
@@ -220,6 +220,8 @@ class WIBAM(GenericDataset):
     # Add original bbox for loss
     ret['bboxes'][cam][obj] = bbox_input
 
+    ret['obj_id'][cam][obj] = ann['obj_id']
+
     ret['score'][cam][obj] = ann['score']
 
     # If this camera number is the prediction camera generate heatmap etc
@@ -232,6 +234,14 @@ class WIBAM(GenericDataset):
 
       # Index of centre location
       ret['ind'][obj] = ct_int[1] * self.opt.output_w + ct_int[0]
+
+      ret['ctr'][obj] = np.array(
+          [(bbox_input[0] + bbox_input[2]) * self.opt.down_ratio / 2, 
+          (bbox_input[1] + bbox_input[3]) * self.opt.down_ratio / 2], 
+          dtype=np.float32)
+
+      u = ret['ind'][obj] % self.opt.output_w
+      v = ret['ind'][obj] - u*self.opt.output_w
     
       # Offset of int and float (decimal part of centre)
       ret['reg'][obj] = ct - ct_int
@@ -265,6 +275,9 @@ class WIBAM(GenericDataset):
     
     # Centre location index
     ret['ind'] = np.zeros((max_objs), dtype=np.int64)
+
+    # Center location
+    ret['ctr'] = np.zeros((max_objs, 2), dtype=np.int64)
     
     # Categories
     ret['cat'] = np.zeros((num_cams, max_objs), dtype=np.int64)
@@ -277,6 +290,9 @@ class WIBAM(GenericDataset):
 
     # Bounding boxes
     ret['bboxes'] = np.zeros((num_cams, max_objs, 4), dtype=np.float32)
+
+    # Object instance id
+    ret['obj_id'] = np.full((num_cams, max_objs), -1, dtype=np.int64)
 
     regression_head_dims = {
       'reg': 2, 'wh': 2}

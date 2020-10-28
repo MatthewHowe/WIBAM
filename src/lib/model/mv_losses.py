@@ -1,10 +1,8 @@
 # File to contain functions for calculating multi view losses
 import torch
 import torch.nn as nn
-from utils.mv_utils import det_cam_to_det_3D_ccf, dets_3D_ccf_to_dets_3D_wcf
-from utils.mv_utils import dets_3D_wcf_to_dets_2D, decode_output
-from utils.mv_utils import _gather_feat, _tranpose_and_gather_feat
-from utils.mv_utils import draw_detections, test_calculations
+from utils.mv_utils import *
+
 
 
 def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
@@ -69,9 +67,9 @@ class ReprojectionLoss(nn.Module):
     calibrations = {}
 
     # Get predictions in format (BN, objects, dim) for each of dep,rot,dim
-    pred_dep = _tranpose_and_gather_feat(output['dep'], batch['ind'])
-    pred_size = _tranpose_and_gather_feat(output['dim'], batch['ind'])
-    pred_rot = _tranpose_and_gather_feat(output['rot'], batch['ind'])
+    pred_dep = tranpose_and_gather_feat(output['dep'], batch['ind'])
+    pred_size = tranpose_and_gather_feat(output['dim'], batch['ind'])
+    pred_rot = tranpose_and_gather_feat(output['rot'], batch['ind'])
 
     decoded_output = decode_output(output, pred_dep.shape[1])
 
@@ -101,20 +99,41 @@ class ReprojectionLoss(nn.Module):
     # Produce all the reprojections for every other camera
     dets_3D_wcf_to_dets_2D(detections, calibrations)
 
-    # # For each sample in the batch
-    # for sample in len(range(batch['images'])):
-    #   # For each camera in the batch
-    #   for cam in len(range(batch['cams'])
-    #     # Reproject all objects onto camera view and get boxes, clipped
+    cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
+                          batch['ctr'], batch['mask'], batch['cam_num'])
+    matched_obj_ids = []
+    matched_det_loc = []
 
+    BN, max_objs = gt_indexes.shape
+    num_cams = calibrations['P'].shape[1]
+    
+    for B in range(BN):
+      cam = batch['cam_num'][B]
+      for obj in range(max_objs):
+        if cost_matrix[B,obj,gt_indexes[B,obj]] < 100:
+          obj_id = batch['obj_id'][B,cam,gt_indexes[B,obj]]
+          if obj_id != -1:
+            matched_obj_ids.append(obj_id)
+            matched_det_loc.append(obj)
 
-        # Calculate GIoU from 2D bounding boxes and reprojections
+    if len(matched_det_loc) != 0:
+      gt_bboxes = []
+      pr_bboxes = []
+      # Put together the ground truth boxes and predicted boxes
+      # For each batch
+      for B in range(BN):
+        for match in range(len(matched_det_loc)):
+          pr_ind = matched_det_loc[B, match]
+          obj_id = matched_obj_ids[B, match]
+          for cam in range(num_cams):
+            obj_id_list = batch['obj_ids'][cam].tolist()
+            gt_ind = obj_id_list.index(obj_id)
+            gt_bboxes.append(batch['bboxes'][B,cam,gt_ind])
+            pr_bboxes.append(detections['2D_bounding_boxes'][B,cam,pr_ind])
+      gt_bboxes = torch.cat(gt_bboxes)
+      pr_bboxes = torch.cat(pr_bboxes)
+      mv_loss = generalized_iou_loss(gt_bboxes,pr_bboxes)
 
-        # Add loss to list of losses for this camera
-
-    # loss = F.l1_loss(pred * mask, target * mask, reduction='elementwise_mean')
-
-    # Sum all the losses from each camera
-    loss = -1
-    # loss = loss / (mask.sum() + 1e-4)
-    return loss
+      return mv_loss
+    else:
+      return 0

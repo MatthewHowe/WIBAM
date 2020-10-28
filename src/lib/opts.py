@@ -252,6 +252,7 @@ class opts(object):
     self.parser.add_argument('--nuscenes_att_weight', type=float, default=1)
     self.parser.add_argument('--velocity', action='store_true')
     self.parser.add_argument('--velocity_weight', type=float, default=1)
+    self.parser.add_argument('--mv_weight', type=float, default=1)
     
     # Multi-view
     self.parser.add_argument('--giou_thresh', type=float, default=-0.5,
@@ -390,7 +391,8 @@ class opts(object):
                    'tracking': opt.tracking_weight,
                    'ltrb_amodal': opt.ltrb_amodal_weight,
                    'nuscenes_att': opt.nuscenes_att_weight,
-                   'velocity': opt.velocity_weight}
+                   'velocity': opt.velocity_weight,
+                   'mv': opt.mv_weight}
     opt.weights = {head: weight_dict[head] for head in opt.heads}
     for head in opt.weights:
       if opt.weights[head] == 0:

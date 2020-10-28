@@ -1,5 +1,5 @@
 # Multi-view utilities file
-
+from scipy.optimize import linear_sum_assignment
 import numpy as np
 import torch.nn as nn
 import torch
@@ -339,7 +339,7 @@ def _gather_feat(feat, ind):
   feat = feat.gather(1, ind)
   return feat
 
-def _tranpose_and_gather_feat(feat, ind):
+def tranpose_and_gather_feat(feat, ind):
   r"""
   Composes the prediction data from a heat map size tensor that contains predictions
   to an output which is peridctions of max_object size for each dimension
@@ -409,3 +409,24 @@ def decode_output(output, K=100, opt=None):
          'xs': xs0, 'ys': ys0, 'centers': cts}
 
   return ret
+
+def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams):
+  num_preds = predicted_centers.shape
+  num_gt = gt_centers.shape[1] 
+  init_value = 1000000
+  match_indexes = np.zeros((num_preds[0],num_preds[1]), dtype=int)
+  cost_matrix = np.full((num_preds[0], num_preds[1], num_gt), init_value, dtype=float)
+  for batch in range(num_preds[0]):
+    # Produce cost matrix
+    for i in range(num_preds[1]):
+      for j in range(num_gt):
+        if gt_mask[batch,cams[batch],j] != 0:
+          cost_matrix[batch,i,j] = torch.norm(predicted_centers[batch, i]-gt_centers[batch, j])
+
+    row_indxs, col_indxs = linear_sum_assignment(cost_matrix[batch])
+    print(cost_matrix[batch,row_indxs,col_indxs].sum())
+    print(cost_matrix[batch,row_indxs,col_indxs])
+    match_indexes[batch] = col_indxs
+    
+
+  return cost_matrix, match_indexes
