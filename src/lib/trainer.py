@@ -19,6 +19,8 @@ from model.utils import _sigmoid, flip_tensor, flip_lr_off, flip_lr
 from utils.debugger import Debugger
 from utils.post_process import generic_post_process
 
+from detector import Detector
+
 class GenericLoss(torch.nn.Module):
   def __init__(self, opt):
     super(GenericLoss, self).__init__()
@@ -100,7 +102,7 @@ class MultiviewLoss(torch.nn.Module):
     super(MultiviewLoss, self).__init__()
     self.FastFocalLoss = FastFocalLoss(opt=opt)
     self.RegWeightedL1Loss = RegWeightedL1Loss()
-    self.ReprojectionLoss = ReprojectionLoss()
+    self.ReprojectionLoss = ReprojectionLoss(opt)
     self.opt = opt
 
   def _sigmoid_output(self, output):
@@ -110,6 +112,7 @@ class MultiviewLoss(torch.nn.Module):
       output['hm_hp'] = _sigmoid(output['hm_hp'])
     if 'dep' in output:
       output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
+      output['dep'] *= self.opt.depth_scale
     return output
 
   def forward(self, outputs, batch):
@@ -223,15 +226,19 @@ class Trainer(object):
       data_time.update(time.time() - end)
 
       
-      # cv2.namedWindow("Preview", cv2.WINDOW_NORMAL)
+      # cv2.namedWindow("Preview_input", cv2.WINDOW_NORMAL)
       # for inp in batch['hm']:
       #   img = inp.numpy()
       #   img = img.transpose(1,2,0)
-      #   cv2.imshow("Preview", img)
-      #   cv2.waitKey(1)
+      #   cv2.imshow("Preview_input", img)
+      #   cv2.waitKey(0)
 
       # Put batches to GPU
       for k in batch:
+        # cv2.namedWindow("Input for model", cv2.WINDOW_NORMAL)
+        # image = np.absolute(batch['image'][0].numpy().transpose(1, 2, 0) * 255).astype(int)
+        # cv2.imshow("Input for model", image)
+        # cv2.waitKey(0)
         if k != 'meta' and k != 'calib':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
@@ -256,19 +263,20 @@ class Trainer(object):
 
       # Logging step
       for l in loss_stats:
-        avg_loss_stats[l].update(
-          loss_stats[l].mean().item(), batch['image'].size(0)
-        )
-        Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
+        if loss_stats[l] != 0:
+          avg_loss_stats[l].update(
+            loss_stats[l].mean().item(), batch['image'].size(0)
+          )
+          Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
 
-        # Tensorboard log
-        if l == "amodel_offset":
-          continue
-        else:
-          if phase == "train":
-            self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_train)
-          elif phase == "val":
-            self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_val)
+          # Tensorboard log
+          if l == "amodel_offset":
+            continue
+          else:
+            if phase == "train":
+              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_train)
+            elif phase == "val":
+              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_val)
       Bar.suffix = Bar.suffix + '|Data {dt.val:.3f}s({dt.avg:.3f}s) ' \
         '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar

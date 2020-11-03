@@ -2,20 +2,23 @@
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import torch.nn as nn
+from utils.ddd_utils import ddd2locrot
 import torch
 import math
 import shapely
 import cv2
 
+# def visually_check_calibration(batch, calib)
+
 def test_calculations(batch, calib):
   location_wcf = np.array([10,10,1.25]).reshape((3,1))
-
+  cam_num = calib['cam_num'][0]
   # Get calibration information
-  rvec = calib['rvec'][0][0].cpu().numpy()
+  rvec = calib['rvec'][0][cam_num].cpu().numpy()
   R = cv2.Rodrigues(rvec)[0]
-  tvec = calib['tvec'][0][0].cpu().numpy()
-  P = calib['P'][0][0].cpu().numpy()
-  dist_coefs = calib['dist_coefs'][0][0].cpu().numpy()
+  tvec = calib['tvec'][0][cam_num].cpu().numpy()
+  P = calib['P'][0][cam_num].cpu().numpy()
+  dist_coefs = calib['dist_coefs'][0][cam_num].cpu().numpy()
 
   center = cv2.projectPoints(location_wcf.reshape((1,1,3)), rvec, tvec,
                              P, dist_coefs)[0]
@@ -91,7 +94,6 @@ def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
   # Initialise list to keep output
   BN, objs, dims = detections['location'].shape
   locations_wcf = torch.zeros((BN, objs, 3)).to(device="cuda")
-  alphas_wcf = torch.zeros((BN, objs)).to(device="cuda")
 
   # Repeat process for each detection
   for batch in range(BN):
@@ -100,7 +102,6 @@ def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
     # Translation from camera to world origin .in c.c.f.
     tvec = calib['tvec'][batch,cam_num]
     rvec = calib['rvec'][batch,cam_num]
-    theta = calib['theta_X_d'][batch,cam_num]
     # Calibration rotation is from world to camera, inv needed
     R_cw = np.linalg.inv(cv2.Rodrigues(rvec.cpu().numpy())[0])
     R_cw = torch.Tensor(R_cw).to(device="cuda")
@@ -111,12 +112,7 @@ def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
       loc_wcf = torch.sub(loc_ccf, tvec).float()
       locations_wcf[batch,obj] = torch.mm(R_cw,loc_wcf).reshape((3))
 
-      # Convert detected angle from rad to degrees
-      alpha_ccf = detections['alpha'][batch][obj] * 180/math.pi
-      alphas_wcf[batch, obj] = alpha_ccf + theta
-
   detections['location_wcf'] = locations_wcf
-  detections['alpha_wcf'] = alphas_wcf
   return detections
 
 def dets_3D_wcf_to_dets_2D(detections, calib):
@@ -136,9 +132,10 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
   BN, objs, dims = detections['location_wcf'].shape
   num_cams = calib['P'].shape[1]
   detections_2D = torch.zeros((BN, num_cams, objs, 4))
-
+  detections_projected3Dbb = torch.zeros((BN, num_cams, objs, 8, 2))
+  
   # Convert 3D detections to 3D bounding boxes
-  detections = det_3D_to_BBox_3D(detections)
+  detections = det_3D_to_BBox_3D(detections, calib)
 
   # Repeat process for each detection
   for batch in range(BN):
@@ -161,13 +158,15 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
 
         bounding_box_cam = bounding_box_cam[:2].transpose(0,1)
 
+        detections_projected3Dbb[batch][cam][obj] = bounding_box_cam
+
         # Find the minimum rectangle fit around the 3D bounding box
         min_x, min_y = torch.min(bounding_box_cam, axis=0)[0]
         max_x, max_y = torch.max(bounding_box_cam, axis=0)[0]
 
         # Append result to list
-        detections_2D[batch][cam][obj] = torch.Tensor([min_x,min_y,max_x,max_y])
-
+        detections_2D[batch][cam][obj] = torch.Tensor([min_x,min_y,max_x-min_x,max_y-min_y])
+  detections['proj_3D_boxes'] = detections_projected3Dbb
   detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
 
   return detections
@@ -211,7 +210,7 @@ def get_rotation_matrix(rotations, degrees=True):
   R = np.dot(R, Z_rotation)
   return R
 
-def det_3D_to_BBox_3D(detections):
+def det_3D_to_BBox_3D(detections, calib):
   r"""
   Convert 3D detection to list of 8 x 3D points for bounding boxes
   Arguments:
@@ -229,24 +228,37 @@ def det_3D_to_BBox_3D(detections):
 
   for batch in range(BN):
     for obj in range(objs):
-      l, w, h = detections['size'][batch,obj]
+      h, w, l = detections['size'][batch,obj]
       alpha = detections['alpha'][batch,obj]
       loc = detections['location_wcf'][batch,obj].reshape((3,1)).cpu()
-
+      cam = calib['cam_num'][batch]
+      P = calib['P'][batch][cam]
+      center_x = P[0,2]
+      f_x = P[0,0]
+      ct = detections['center'][batch][obj]
       # Get rotation around Z axis
-      rotation_matrix = get_rotation_matrix(np.array([0,0,alpha]))
+      # rotation_z = calib['theta_X_d'][batch][cam]*math.pi/180 + 0 + torch.atan((ct[0]-center_x)/f_x)
+      
+      rotation_camera = calib['theta_X_d'][batch][cam]*math.pi/180 - math.pi/2
+      rotation_object = alpha + torch.atan((ct[0]-center_x)/f_x)
+      if rotation_object > np.pi:
+        rotation_object -= 2 * np.pi
+      if rotation_object < -np.pi:
+        rotation_object += 2 * np.pi
+      rotation_z = rotation_camera - rotation_object
+      rotation_matrix = get_rotation_matrix(np.array([0,0,rotation_z]), False)
       rotation_matrix = torch.Tensor(rotation_matrix)
 
       # Get bounding box points
       bounding_box_3D_points = torch.Tensor([
-        [l/2,-w/2,0],
-        [l/2,w/2,0],
-        [-l/2,-w/2,0],
-        [-l/2,w/2,0],
-        [l/2,-w/2,h],
-        [l/2,w/2,h],
-        [-l/2,-w/2,h],
-        [-l/2,w/2,h],
+        [l/2, -w/2,-h/2],
+        [l/2,  w/2,-h/2],
+        [-l/2, w/2,-h/2],
+        [-l/2,-w/2,-h/2],
+        [l/2, -w/2, h/2],
+        [l/2,  w/2, h/2],
+        [-l/2, w/2, h/2],
+        [-l/2,-w/2, h/2]
       ]).transpose(0,1)
 
       # Rotate bounding box
@@ -258,9 +270,9 @@ def det_3D_to_BBox_3D(detections):
       # Append to return variable
       bounding_box_3D[batch,obj] = torch.transpose(bounding_box_3D_points, 0, 1)
 
-    detections['3D_bounding_boxes'] = bounding_box_3D.to(device='cuda')
+  detections['3D_bounding_boxes'] = bounding_box_3D.to(device='cuda')
 
-    return detections
+  return detections
 
 def unproject_2d_to_3d(center, depth, calib):
   r"""
@@ -290,8 +302,8 @@ def unproject_2d_to_3d(center, depth, calib):
     v = center[batch,:,1]
 
     z = (depth[batch].reshape((center.shape[1])))
-    x = (((u - P[0, 2]) * z) / P[0, 0])
-    y = (((v - P[1, 2]) * z) / P[1, 1])
+    x = ((u - P[0, 2]) * z) / P[0, 0]
+    y = ((v - P[1, 2]) * z) / P[1, 1]
 
     locations[batch][0] = x
     locations[batch][1] = y 
@@ -406,9 +418,114 @@ def decode_output(output, K=100, opt=None):
   bboxes = None
   cts = torch.cat([xs0.unsqueeze(2), ys0.unsqueeze(2)], dim=2)
   ret = {'scores': scores, 'clses': clses.float(), 
-         'xs': xs0, 'ys': ys0, 'centers': cts}
+         'xs': xs0, 'ys': ys0, 'cts': cts}
+
+  if 'reg' in output:
+    reg = output['reg']
+    reg = tranpose_and_gather_feat(reg, inds)
+    reg = reg.view(batch, K, 2)
+    xs = xs0.view(batch, K, 1) + reg[:, :, 0:1]
+    ys = ys0.view(batch, K, 1) + reg[:, :, 1:2]
+  else:
+    xs = xs0.view(batch, K, 1) + 0.5
+    ys = ys0.view(batch, K, 1) + 0.5
+
+  if 'wh' in output:
+    wh = output['wh']
+    wh = tranpose_and_gather_feat(wh, inds) # B x K x (F)
+    # wh = wh.view(batch, K, -1)
+    wh = wh.view(batch, K, 2)
+    wh[wh < 0] = 0
+    if wh.size(2) == 2 * cat: # cat spec
+      wh = wh.view(batch, K, -1, 2)
+      cats = clses.view(batch, K, 1, 1).expand(batch, K, 1, 2)
+      wh = wh.gather(2, cats.long()).squeeze(2) # B x K x 2
+    else:
+      pass
+    bboxes = torch.cat([xs - wh[..., 0:1] / 2, 
+                        ys - wh[..., 1:2] / 2,
+                        xs + wh[..., 0:1] / 2, 
+                        ys + wh[..., 1:2] / 2], dim=2)
+    ret['bboxes'] = bboxes
+    # print('ret bbox', ret['bboxes'])
+ 
+  if 'ltrb' in output:
+    ltrb = output['ltrb']
+    ltrb = tranpose_and_gather_feat(ltrb, inds) # B x K x 4
+    ltrb = ltrb.view(batch, K, 4)
+    bboxes = torch.cat([xs0.view(batch, K, 1) + ltrb[..., 0:1], 
+                        ys0.view(batch, K, 1) + ltrb[..., 1:2],
+                        xs0.view(batch, K, 1) + ltrb[..., 2:3], 
+                        ys0.view(batch, K, 1) + ltrb[..., 3:4]], dim=2)
+    ret['bboxes'] = bboxes
+
+ 
+  regression_heads = ['tracking', 'dep', 'rot', 'dim', 'amodel_offset',
+    'nuscenes_att', 'velocity']
+
+  for head in regression_heads:
+    if head in output:
+      ret[head] = tranpose_and_gather_feat(
+        output[head], inds).view(batch, K, -1)
 
   return ret
+
+def get_affine_transform(center,
+                         scale,
+                         rot,
+                         output_size,
+                         shift=np.array([0, 0], dtype=np.float32),
+                         inv=0):
+    if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
+        scale = np.array([scale, scale], dtype=np.float32)
+
+    scale_tmp = scale
+    src_w = scale_tmp[0]
+    dst_w = output_size[0]
+    dst_h = output_size[1]
+
+    rot_rad = np.pi * rot / 180
+    src_dir = get_dir([0, src_w * -0.5], rot_rad)
+    dst_dir = np.array([0, dst_w * -0.5], np.float32)
+
+    src = np.zeros((3, 2), dtype=np.float32)
+    dst = np.zeros((3, 2), dtype=np.float32)
+    src[0, :] = center + scale_tmp * shift
+    src[1, :] = center + src_dir + scale_tmp * shift
+    dst[0, :] = [dst_w * 0.5, dst_h * 0.5]
+    dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float32) + dst_dir
+
+    src[2:, :] = get_3rd_point(src[0, :], src[1, :])
+    dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
+
+    if inv:
+        trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
+    else:
+        trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
+
+    return trans
+
+def transform_preds_with_trans(coords, trans):
+    # target_coords = np.concatenate(
+    #   [coords, np.ones((coords.shape[0], 1), np.float32)], axis=1)
+    target_coords = np.ones((coords.shape[0], 3), np.float32)
+    target_coords = torch.Tensor(target_coords)
+    target_coords[:, :2] = coords.cpu()
+    target_coords = torch.mm(trans, target_coords.transpose(0,1)).transpose(0,1)
+    return target_coords[:, :2]
+
+def get_3rd_point(a, b):
+    direct = a - b
+    return b + np.array([-direct[1], direct[0]], dtype=np.float32)
+
+def get_dir(src_point, rot_rad):
+    sn, cs = np.sin(rot_rad), np.cos(rot_rad)
+
+    src_result = [0, 0]
+    src_result[0] = src_point[0] * cs - src_point[1] * sn
+    src_result[1] = src_point[0] * sn + src_point[1] * cs
+
+    return src_result
 
 def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams):
   num_preds = predicted_centers.shape
@@ -424,8 +541,6 @@ def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams)
           cost_matrix[batch,i,j] = torch.norm(predicted_centers[batch, i]-gt_centers[batch, j])
 
     row_indxs, col_indxs = linear_sum_assignment(cost_matrix[batch])
-    print(cost_matrix[batch,row_indxs,col_indxs].sum())
-    print(cost_matrix[batch,row_indxs,col_indxs])
     match_indexes[batch] = col_indxs
     
 

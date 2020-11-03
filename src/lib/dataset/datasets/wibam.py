@@ -17,15 +17,39 @@ from utils.ddd_utils import compute_box_3d, project_to_image
 from utils.image import gaussian_radius, draw_umich_gaussian
 
 class WIBAM(GenericDataset):
-  num_categories = 1
-  default_resolution = [1088, 1920]
-  # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
-  #       'Tram', 'Misc', 'DontCare']
-  class_name = ['Car']
-  # negative id is for "not as negative sample for abs(id)".
-  # 0 for ignore losses for all categories in the bounding box region
-  cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
+  ## ORIGINAL
+  default_resolution = [448, 800]
+  num_categories = 10
+  class_name = [
+    'car', 'truck', 'bus', 'trailer', 
+    'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
+    'traffic_cone', 'barrier']
+  cat_ids = {i + 1: i + 1 for i in range(num_categories)}
+  focal_length = 1046
   max_objs = 50
+  _tracking_ignored_class = ['construction_vehicle', 'traffic_cone', 'barrier']
+  _vehicles = ['car', 'truck', 'bus', 'trailer', 'construction_vehicle']
+  _cycles = ['motorcycle', 'bicycle']
+  _pedestrians = ['pedestrian']
+  attribute_to_id = {
+    '': 0, 'cycle.with_rider' : 1, 'cycle.without_rider' : 2,
+    'pedestrian.moving': 3, 'pedestrian.standing': 4, 
+    'pedestrian.sitting_lying_down': 5,
+    'vehicle.moving': 6, 'vehicle.parked': 7, 
+    'vehicle.stopped': 8}
+  id_to_attribute = {v: k for k, v in attribute_to_id.items()}
+
+  ## WIBAM
+  # num_categories = 10
+  # # focal_length = 1046
+  # default_resolution = [448 , 800]
+  # # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
+  # #       'Tram', 'Misc', 'DontCare']
+  # class_name = ['car']
+  # # negative id is for "not as negative sample for abs(id)".
+  # # 0 for ignore losses for all categories in the bounding box region
+  # cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
+  # max_objs = 50
 
   # Initialisation function
   def __init__(self, opt, split):
@@ -72,7 +96,7 @@ class WIBAM(GenericDataset):
     # output is a list of outputs for each image at instances
     # in the case of instance_batching, else just a list of one
     # image and annotaitons
-    imgs, cams, imgs_anns, imgs_info, imgs_path = self._load_data(index)
+    imgs, cams, imgs_anns, imgs_info, imgs_path, drawing_images = self._load_data(index)
 
     ###############
     # All data augmentation code was here - removed
@@ -99,10 +123,13 @@ class WIBAM(GenericDataset):
 
       inp = self._get_input(img, trans_input)
       
+      # inp = ((inp / 255. - np.array([0.40789655, 0.44719303, 0.47026116]) / np.array([0.2886383, 0.27408165, 0.27809834]) ))
+
       # initialise return variable
       ret = {'image': inp}
       # Cam number for this image
       ret['cam_num'] = cam_num
+      ret['drawing_images'] = np.array(drawing_images)
 
       # Get calibration information and put into np.arrays for collation
       P, dist_coefs, rvec, tvec, theta_X_d = self._get_calib(imgs_info)
@@ -186,9 +213,11 @@ class WIBAM(GenericDataset):
     inp = cv2.warpAffine(img, trans_input,
                         (self.opt.input_w, self.opt.input_h),
                         flags=cv2.INTER_LINEAR)
-
+    # cv2.imshow("inp_w", inp)
+    # cv2.waitKey(0)
     inp = (inp.astype(np.float32) / 255.)
     inp = (inp - self.mean) / self.std
+    
     inp = inp.transpose(2, 0, 1)
     return inp
 
@@ -235,14 +264,12 @@ class WIBAM(GenericDataset):
       # Index of centre location
       ret['ind'][obj] = ct_int[1] * self.opt.output_w + ct_int[0]
 
-      ret['ctr'][obj] = np.array(
-          [(bbox_input[0] + bbox_input[2]) * self.opt.down_ratio / 2, 
-          (bbox_input[1] + bbox_input[3]) * self.opt.down_ratio / 2], 
-          dtype=np.float32)
+      # ret['ctr'][obj] = np.array(
+      #     [(bbox_input[0] + bbox_input[2] / 2), 
+      #     (bbox_input[1] + bbox_input[3] / 2)], 
+      #     dtype=np.float32)
+      ret['ctr'][obj] = ct
 
-      u = ret['ind'][obj] % self.opt.output_w
-      v = ret['ind'][obj] - u*self.opt.output_w
-    
       # Offset of int and float (decimal part of centre)
       ret['reg'][obj] = ct - ct_int
     
@@ -347,9 +374,9 @@ class WIBAM(GenericDataset):
       id = self.instances[index]
     else:
       id = self.images[index]
-    img, cams, anns, img_info, img_path = self._load_image_anns(id, self.coco, self.img_dir)
+    img, cams, anns, img_info, img_path, drawing_images = self._load_image_anns(id, self.coco, self.img_dir)
 
-    return img, cams, anns, img_info, img_path
+    return img, cams, anns, img_info, img_path, drawing_images
 
   # Loads image annotations from file
   def _load_image_anns(self, id, coco, img_dir):
@@ -366,6 +393,7 @@ class WIBAM(GenericDataset):
     imgs_anns = []
     cam_nums = []
     imgs = []
+    drawing_images = []
 
     # Need to decipher between loading all instances at a time and singular image
     if self.instance_batching:
@@ -394,7 +422,6 @@ class WIBAM(GenericDataset):
       # Append corredsponding cam number
       cam_nums.append(cam_num)
 
-
       # Load all annotations for that instance
       for j in range(num_cams):
         # Calculate the id number of the other camera images
@@ -403,6 +430,10 @@ class WIBAM(GenericDataset):
         # Therefore cam_ID = current_ID + index - cam
         ann_img_id = img_id + j - cam_num
         img_info = coco.loadImgs(ids=[ann_img_id])[0]
+
+        file_name = img_info['file_name']
+        img_path = os.path.join(img_dir, file_name)
+        drawing_images.append(cv2.imread(img_path))
 
         # Use coco utils to get annotation IDs for image instance
         ann_ids = coco.getAnnIds(imgIds=[ann_img_id])
@@ -415,7 +446,7 @@ class WIBAM(GenericDataset):
       
 
     # Return results
-    return imgs, cam_nums, imgs_anns, imgs_info, imgs_path
+    return imgs, cam_nums, imgs_anns, imgs_info, imgs_path, drawing_images
 
   # Dataloader uses this function to create the iterable dataset
   def __len__(self):

@@ -92,7 +92,7 @@ def main(opt):
     collate_fn=default_collate
 
   train_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'train'), batch_size=batch_size, shuffle=True,
+      Dataset(opt, 'train'), batch_size=batch_size, shuffle=False,
       num_workers=opt.num_workers, 
       collate_fn=collate_fn, 
       pin_memory=True, drop_last=True

@@ -44,10 +44,10 @@ class GenericDataset(data.Dataset):
   flip_idx = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10],
               [11, 12], [13, 14], [15, 16]]
 
-  # For flipping annotations
-  mean = np.array([0.40789654, 0.44719302, 0.47026115],
+  # For normalising images
+  mean = np.array([0.40789655, 0.44719303, 0.47026116],
                    dtype=np.float32).reshape(1, 1, 3)
-  std  = np.array([0.28863828, 0.27408164, 0.27809835],
+  std  = np.array([0.2886383, 0.27408165, 0.27809834],
                    dtype=np.float32).reshape(1, 1, 3)
   
   # Colour augmentation

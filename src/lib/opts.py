@@ -151,7 +151,7 @@ class opts(object):
                              help='multi scale test augmentation.')
     self.parser.add_argument('--nms', action='store_true',
                              help='run nms in testing.')
-    self.parser.add_argument('--K', type=int, default=100,
+    self.parser.add_argument('--K', type=int, default=50 ,
                              help='max number of output objects.') 
     self.parser.add_argument('--not_prefetch_test', action='store_true',
                              help='not use parallal data pre-processing.')
@@ -360,8 +360,8 @@ class opts(object):
       opt.heads.update({'tracking': 2})
 
     # Remove 'ddd' with amodel_offset
-    # if 'ddd' in opt.task:
-    #   opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3, 'amodel_offset': 2})
+    if 'ddd' in opt.task:
+      opt.heads.update({'dep': 1, 'rot': 8, 'dim': 3, 'amodel_offset': 2})
     
     # Replace with one with no amodel offset
     if 'ddd' in opt.task:

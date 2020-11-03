@@ -83,7 +83,8 @@ class BaseModel(nn.Module):
               z.append(self.__getattr__(head)(feats[s]))
           out.append(z)
       else:
-        for s in range(self.num_stacks):
+        map = x.cpu().numpy()
+        for s in range(self.num_stacks):    
           z = {}
           for head in self.heads:
               z[head] = self.__getattr__(head)(feats[s])
