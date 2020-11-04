@@ -17,39 +17,39 @@ from utils.ddd_utils import compute_box_3d, project_to_image
 from utils.image import gaussian_radius, draw_umich_gaussian
 
 class WIBAM(GenericDataset):
-  ## ORIGINAL
-  default_resolution = [448, 800]
-  num_categories = 10
-  class_name = [
-    'car', 'truck', 'bus', 'trailer', 
-    'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
-    'traffic_cone', 'barrier']
-  cat_ids = {i + 1: i + 1 for i in range(num_categories)}
-  focal_length = 1046
-  max_objs = 50
-  _tracking_ignored_class = ['construction_vehicle', 'traffic_cone', 'barrier']
-  _vehicles = ['car', 'truck', 'bus', 'trailer', 'construction_vehicle']
-  _cycles = ['motorcycle', 'bicycle']
-  _pedestrians = ['pedestrian']
-  attribute_to_id = {
-    '': 0, 'cycle.with_rider' : 1, 'cycle.without_rider' : 2,
-    'pedestrian.moving': 3, 'pedestrian.standing': 4, 
-    'pedestrian.sitting_lying_down': 5,
-    'vehicle.moving': 6, 'vehicle.parked': 7, 
-    'vehicle.stopped': 8}
-  id_to_attribute = {v: k for k, v in attribute_to_id.items()}
-
-  ## WIBAM
+  # ## ORIGINAL
+  # default_resolution = [448, 800]
   # num_categories = 10
-  # # focal_length = 1046
-  # default_resolution = [448 , 800]
-  # # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
-  # #       'Tram', 'Misc', 'DontCare']
-  # class_name = ['car']
-  # # negative id is for "not as negative sample for abs(id)".
-  # # 0 for ignore losses for all categories in the bounding box region
-  # cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
+  # class_name = [
+  #   'car', 'truck', 'bus', 'trailer', 
+  #   'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
+  #   'traffic_cone', 'barrier']
+  # cat_ids = {i + 1: i + 1 for i in range(num_categories)}
+  # focal_length = 1046
   # max_objs = 50
+  # _tracking_ignored_class = ['construction_vehicle', 'traffic_cone', 'barrier']
+  # _vehicles = ['car', 'truck', 'bus', 'trailer', 'construction_vehicle']
+  # _cycles = ['motorcycle', 'bicycle']
+  # _pedestrians = ['pedestrian']
+  # attribute_to_id = {
+  #   '': 0, 'cycle.with_rider' : 1, 'cycle.without_rider' : 2,
+  #   'pedestrian.moving': 3, 'pedestrian.standing': 4, 
+  #   'pedestrian.sitting_lying_down': 5,
+  #   'vehicle.moving': 6, 'vehicle.parked': 7, 
+  #   'vehicle.stopped': 8}
+  # id_to_attribute = {v: k for k, v in attribute_to_id.items()}
+
+  # WIBAM
+  num_categories = 1
+  focal_length = 1046
+  default_resolution = [448 , 800]
+  # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
+  #       'Tram', 'Misc', 'DontCare']
+  class_name = ['car']
+  # negative id is for "not as negative sample for abs(id)".
+  # 0 for ignore losses for all categories in the bounding box region
+  cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
+  max_objs = 50
 
   # Initialisation function
   def __init__(self, opt, split):

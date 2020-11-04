@@ -61,6 +61,7 @@ def main(opt):
     model, optimizer, start_epoch = load_model(
       model, opt.load_model, opt, optimizer)
 
+  
   # Initialise trainer class
   trainer = Trainer(opt, model, writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
@@ -69,7 +70,7 @@ def main(opt):
   if opt.val_intervals < opt.num_epochs or opt.test:
     print('Setting up validation data...')
     val_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'val'), batch_size=1, shuffle=False, num_workers=1,
+      Dataset(opt, 'val'), batch_size=1, shuffle=True, num_workers=1,
       pin_memory=True)
 
     if opt.test:
@@ -92,23 +93,20 @@ def main(opt):
     collate_fn=default_collate
 
   train_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'train'), batch_size=batch_size, shuffle=False,
+      Dataset(opt, 'train'), batch_size=batch_size, shuffle=True,
       num_workers=opt.num_workers, 
       collate_fn=collate_fn, 
       pin_memory=True, drop_last=True
   )
 
   print('Starting training...')
-  for epoch in range(start_epoch + 1, opt.num_epochs + 1):
+  for epoch in range(start_epoch+1, opt.num_epochs + 1):
     mark = epoch if opt.save_all else 'last'
-    log_dict_train, _ = trainer.train(epoch, train_loader)
-    logger.write('epoch: {} |'.format(epoch))
-    for k, v in log_dict_train.items():
-      logger.scalar_summary('train_{}'.format(k), v, epoch)
-      logger.write('{} {:8f} | '.format(k, v))
+    
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
                  epoch, model, optimizer)
+    
       with torch.no_grad():
         log_dict_val, preds = trainer.val(epoch, val_loader)
         if opt.eval_val:
@@ -116,9 +114,21 @@ def main(opt):
       for k, v in log_dict_val.items():
         logger.scalar_summary('val_{}'.format(k), v, epoch)
         logger.write('{} {:8f} | '.format(k, v))
+
     else:
       save_model(os.path.join(opt.save_dir, 'model_last.pth'), 
                  epoch, model, optimizer)
+
+    log_dict_train, _ = trainer.train(epoch, train_loader)
+    logger.write('epoch: {} |'.format(epoch))
+
+    
+
+    for k, v in log_dict_train.items():
+      logger.scalar_summary('train_{}'.format(k), v, epoch)
+      logger.write('{} {:8f} | '.format(k, v))
+    
+    
     logger.write('\n')
     if epoch in opt.save_point:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)), 

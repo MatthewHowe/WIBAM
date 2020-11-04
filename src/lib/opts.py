@@ -394,6 +394,7 @@ class opts(object):
                    'velocity': opt.velocity_weight,
                    'mv': opt.mv_weight}
     opt.weights = {head: weight_dict[head] for head in opt.heads}
+    opt.weights['mv'] = weight_dict['mv']
     for head in opt.weights:
       if opt.weights[head] == 0:
         del opt.heads[head]

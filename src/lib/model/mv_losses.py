@@ -103,41 +103,35 @@ class ReprojectionLoss(nn.Module):
     max_objects = self.opt.K
     num_cams = batch['P'][0].shape[1]
 
-    calibs_ten = []
-    calibs_arr = []
-    for B in range(BN):
-      cam = batch['cam_num'][B]
-      calib = batch['P'][B][cam].to('cpu').numpy()
-      trans = np.array([[0,0,0]]).T
-      calib = np.concatenate((calib,trans), axis=1)
-      calibs_ten.append(torch.Tensor(calib))
-      calibs_arr.append(calib)
-
     decoded_output = decode_output(output, self.opt.K)
 
-    ctrs = np.zeros((BN,max_objects,2))
+    # Post processing code
+    ctrs = torch.zeros((BN,max_objects,2)).to('cuda')
     trans = get_affine_transform(
       np.array([960,540]), 1920, 0, (200, 112), inv=1).astype(np.float32)
-    trans = torch.Tensor(trans)
+    trans = torch.Tensor(trans).to('cuda')
 
-    homog = torch.ones((len(decoded_output['cts'][0]),1)).reshape(50,1)
+    homog = torch.ones(max_objects,1).to('cuda')
+    
     for B in range(BN):
-      cts = torch.cat((decoded_output['cts'][B].cpu(),homog),1)
+      ct_output = decoded_output['bboxes'][B].reshape(max_objects,2, 2).mean(axis=1)
+      amodel_ct_output = ct_output + decoded_output['amodel_offset'][B]
+      cts = amodel_ct_output.reshape(max_objects, 2)
+      cts = torch.cat((cts,homog),1)
       ctrs[B] = torch.mm(cts, trans.T)
+
     # Put detections into their own dictionary with required information
     # Scale depth with focal length
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
-    detections['center'] = torch.Tensor(ctrs).to('cuda')
+    detections['center'] = ctrs
     calibrations['cam_num'] = batch['cam_num']
     calibrations['P'] = batch['P']
     calibrations['dist_coefs'] = batch['dist_coefs']
     calibrations['tvec'] = batch['tvec']
     calibrations['rvec'] = batch['rvec']
     calibrations['theta_X_d'] = batch['theta_X_d']
-
-    drawing_images = batch['drawing_images'].to('cpu').numpy()
   
     # Get predictions in camera.c.f loc(x,y,z), rot(alpha),size(l,w,h)
     # Adds them to detections dict
@@ -150,44 +144,23 @@ class ReprojectionLoss(nn.Module):
     # Produce all the reprojections for every other camera
     dets_3D_wcf_to_dets_2D(detections, calibrations)
 
-
+    # Get the ground truth centers
     gt_centers = batch['ctr'].type(torch.float)
     for B in range(BN):
-      temp_gt = torch.cat((gt_centers[B], homog.to('cuda')), 1)
-      gt_centers[B] = torch.mm(temp_gt, trans.T.to('cuda'))
+      temp_gt = torch.cat((gt_centers[B], homog), 1)
+      gt_centers[B] = torch.mm(temp_gt, trans.T)
 
     cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
                           gt_centers, batch['mask'], batch['cam_num'])
+
     matched_obj_ids = []
     matched_det_loc = []
-
-    BN, max_objs = gt_indexes.shape
-    num_cams = calibrations['P'].shape[1]
-    
-    for B in range(BN):
-      cam = calibrations['cam_num'][B]
-      P = calibrations['P'][B][cam].to('cpu').numpy()
-      trans = np.array([[0,0,0]]).T
-      P = np.concatenate((P,trans), axis=1)
-      for det in range(len(detections['depth'][B])):
-        loc, rot = ddd2locrot(detections['center'][B,det].to('cpu').detach().numpy(), detections['alpha'][B,det].to('cpu').detach().numpy(),
-                              detections['size'][B,det].to('cpu').detach().numpy(), detections['depth'][B,det].to('cpu').detach().numpy(), P)
-        box_2d = project_3d_bbox(loc, detections['size'][B,det].to('cpu').detach().numpy(), rot, P)
-
-    # Draw centers
-    centers = detections['center'].cpu().numpy().astype(int)
-    for B in range(BN):
-      for center in centers[B]:
-        cv2.circle(drawing_images[B,batch['cam_num'][B]], tuple(center), 3, (0,0,255), -1)
-      cv2.namedWindow('Detection centers', cv2.WINDOW_NORMAL)
-      cv2.imshow('Detection centers', drawing_images[B,batch['cam_num'][B]])
-      cv2.waitKey(0)
 
     for B in range(BN):
       matches_obj = []
       matches_det = []
       cam = batch['cam_num'][B]
-      for obj in range(max_objs):
+      for obj in range(max_objects):
         if cost_matrix[B,obj,gt_indexes[B,obj]] < 100:
           obj_id = batch['obj_id'][B,cam,gt_indexes[B,obj]]
           if obj_id != -1:
@@ -198,6 +171,8 @@ class ReprojectionLoss(nn.Module):
 
     mv_loss = 0
     
+    # drawing_images = batch['drawing_images'].numpy()
+
     # Put together the ground truth boxes and predicted boxes
     # For each batch
     for B in range(BN):
@@ -205,7 +180,6 @@ class ReprojectionLoss(nn.Module):
       pr_bboxes = []
       num_matches = len(matched_det_loc[B])
       if num_matches != 0:
-        colours, _, _ = generate_colors(num_matches)
         for match in range(num_matches):
           pr_ind = matched_det_loc[B][match]
           obj_id = matched_obj_ids[B][match]
@@ -215,23 +189,49 @@ class ReprojectionLoss(nn.Module):
               gt_ind = obj_id_list.index(obj_id)
             except:
               continue
-            gt_box = batch['bboxes'][B,cam,gt_ind].to('cpu').numpy().astype(int)
-            pr_box = detections['2D_bounding_boxes'][B,cam,pr_ind].to('cpu').numpy().astype(int)
-            pr_3D_box = detections['proj_3D_boxes'][B,cam,pr_ind].to('cpu').detach().numpy()
             gt_bboxes.append(batch['bboxes'][B,cam,gt_ind])
             pr_bboxes.append(detections['2D_bounding_boxes'][B,cam,pr_ind])
-            img = drawing_images[B,cam]
-            draw_box_3d(img, pr_3D_box, colours[match])
-            cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[match], 2)
-            cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[match], 2)
+
 
         gt_bboxes = torch.stack(gt_bboxes)
         pr_bboxes = torch.stack(pr_bboxes)
         mv_loss += generalized_iou_loss(gt_bboxes,pr_bboxes)
-        cv2.namedWindow("GT and Predicted bounding boxes", cv2.WINDOW_NORMAL)
-        for image in drawing_images[B]:
-          
-          cv2.imshow("GT and Predicted bounding boxes", image)
-          cv2.waitKey(0)
+
+    # # Put together the ground truth boxes and predicted boxes
+    # # For each batch
+    # for B in range(BN):
+    #   num_matches = len(matched_det_loc[B])
+    #   if num_matches != 0:
+    #     colours, _, _ = generate_colors(num_matches)
+    #     for match in range(num_matches):
+    #       pr_ind = matched_det_loc[B][match]
+    #       obj_id = matched_obj_ids[B][match]
+    #       for cam in range(num_cams):
+    #         obj_id_list = batch['obj_id'][B][cam].tolist()
+    #         try:
+    #           gt_ind = obj_id_list.index(obj_id)
+    #         except:
+    #           continue
+    #         gt_box = batch['bboxes'][B,cam,gt_ind].cpu().numpy().astype(int)
+    #         pr_box = detections['2D_bounding_boxes'][B,cam,pr_ind].cpu().numpy().astype(int)
+    #         pr_3D_box = detections['proj_3D_boxes'][B,cam,pr_ind].cpu().detach().numpy()
+    #         img = drawing_images[B,cam]
+    #         draw_box_3d(img, pr_3D_box, colours[match])
+    #         cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[match], 2)
+    #         cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[match], 2)
+
+    #     cv2.namedWindow("GT and Predicted bounding boxes", cv2.WINDOW_NORMAL)
+    #     for image in drawing_images[B]:
+    #       cv2.imshow("GT and Predicted bounding boxes", image)
+    #       cv2.waitKey(0)
+
+    # # Draw centers
+    # centers = detections['center'].cpu().numpy().astype(int)
+    # for B in range(BN):
+    #   for center in centers[B]:
+    #     cv2.circle(drawing_images[B,batch['cam_num'][B]], tuple(center), 3, (0,0,255), -1)
+    #   cv2.namedWindow('Detection centers', cv2.WINDOW_NORMAL)
+    #   cv2.imshow('Detection centers', drawing_images[B,batch['cam_num'][B]])
+    #   cv2.waitKey(0)
 
     return mv_loss

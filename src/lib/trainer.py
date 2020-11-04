@@ -6,6 +6,7 @@ import cv2
 import time
 import torch
 import numpy as np
+import torchviz as viz
 from progress.bar import Bar
 
 from model.data_parallel import DataParallel
@@ -89,7 +90,9 @@ class GenericLoss(torch.nn.Module):
     losses['tot'] = 0
     for head in opt.heads:
       losses['tot'] += opt.weights[head] * losses[head]
-
+    
+    
+    
     return losses['tot'], losses
 
 class MultiviewLoss(torch.nn.Module):
@@ -159,7 +162,8 @@ class MultiviewLoss(torch.nn.Module):
       losses['mv'] += self.ReprojectionLoss(output,batch)
       for key, val in losses.items():
         if key != 'tot':
-          losses['tot'] += val
+          losses['tot'] += val * self.opt.weights[key]
+
       return losses['tot'], losses
 
 class ModleWithLoss(torch.nn.Module):
@@ -225,21 +229,9 @@ class Trainer(object):
 
       data_time.update(time.time() - end)
 
-      
-      # cv2.namedWindow("Preview_input", cv2.WINDOW_NORMAL)
-      # for inp in batch['hm']:
-      #   img = inp.numpy()
-      #   img = img.transpose(1,2,0)
-      #   cv2.imshow("Preview_input", img)
-      #   cv2.waitKey(0)
-
       # Put batches to GPU
       for k in batch:
-        # cv2.namedWindow("Input for model", cv2.WINDOW_NORMAL)
-        # image = np.absolute(batch['image'][0].numpy().transpose(1, 2, 0) * 255).astype(int)
-        # cv2.imshow("Input for model", image)
-        # cv2.waitKey(0)
-        if k != 'meta' and k != 'calib':
+        if k != 'meta' and k != 'calib' and k != 'drawing_images':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
       # Run outputs for batch from model with losses

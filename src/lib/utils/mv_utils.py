@@ -135,7 +135,7 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
   detections_projected3Dbb = torch.zeros((BN, num_cams, objs, 8, 2))
   
   # Convert 3D detections to 3D bounding boxes
-  detections = det_3D_to_BBox_3D(detections, calib)
+  det_3D_to_BBox_3D(detections, calib)
 
   # Repeat process for each detection
   for batch in range(BN):
@@ -165,7 +165,12 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
         max_x, max_y = torch.max(bounding_box_cam, axis=0)[0]
 
         # Append result to list
-        detections_2D[batch][cam][obj] = torch.Tensor([min_x,min_y,max_x-min_x,max_y-min_y])
+        # TODO: Problem with autograd at this point creating new tensor
+        detections_2D[batch][cam][obj][0] = min_x
+        detections_2D[batch][cam][obj][0] = min_y
+        detections_2D[batch][cam][obj][0] = max_x-min_x
+        detections_2D[batch][cam][obj][0] = max_y-min_y
+
   detections['proj_3D_boxes'] = detections_projected3Dbb
   detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
 
