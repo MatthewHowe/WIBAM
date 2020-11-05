@@ -167,9 +167,9 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
         # Append result to list
         # TODO: Problem with autograd at this point creating new tensor
         detections_2D[batch][cam][obj][0] = min_x
-        detections_2D[batch][cam][obj][0] = min_y
-        detections_2D[batch][cam][obj][0] = max_x-min_x
-        detections_2D[batch][cam][obj][0] = max_y-min_y
+        detections_2D[batch][cam][obj][1] = min_y
+        detections_2D[batch][cam][obj][2] = max_x-min_x
+        detections_2D[batch][cam][obj][3] = max_y-min_y
 
   detections['proj_3D_boxes'] = detections_projected3Dbb
   detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
@@ -550,3 +550,19 @@ def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams)
     
 
   return cost_matrix, match_indexes
+
+def return_four_frames(images, resize=False):
+  # Arrange frames
+  img_top = np.hstack((images[0],images[1]))
+  img_bot = np.hstack((images[2],images[3]))
+  all_imgs = np.vstack((img_top,img_bot))
+
+  # Resize and show images
+  h, w, d = all_imgs.shape
+  ratio = w / h
+
+  if resize:
+    all_imgs = cv2.resize(all_imgs,(resize,int(resize/ratio)))
+
+  return all_imgs
+  

@@ -137,8 +137,8 @@ class MultiviewLoss(torch.nn.Module):
       output = outputs[s]
       output = self._sigmoid_output(output)
 
-      cat = torch.zeros((opt.batch_size,50),dtype=int).to(device=opt.device, non_blocking=True)
-      mask = torch.zeros((opt.batch_size,50),dtype=int).to(device=opt.device, non_blocking=True)
+      cat = torch.zeros((len(batch['cam_num']),50),dtype=int).to(device=opt.device, non_blocking=True)
+      mask = torch.zeros((len(batch['cam_num']),50),dtype=int).to(device=opt.device, non_blocking=True)
 
       for i in range(len(batch['cam_num'])):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]
@@ -159,10 +159,16 @@ class MultiviewLoss(torch.nn.Module):
           mask, cat) / opt.num_stacks
 
       # Reprojection loss
-      losses['mv'] += self.ReprojectionLoss(output,batch)
+      mv_loss = self.ReprojectionLoss(output,batch)
+      losses['mv'] += mv_loss['tot']
+
       for key, val in losses.items():
         if key != 'tot':
           losses['tot'] += val * self.opt.weights[key]
+
+      for key, val in mv_loss.items():
+        if key != 'tot':
+          losses["mv_{}".format(key)] = val
 
       return losses['tot'], losses
 
@@ -216,7 +222,7 @@ class Trainer(object):
     opt = self.opt
     results = {}
     data_time, batch_time = AverageMeter(), AverageMeter()
-    avg_loss_stats = {l: AverageMeter() for l in self.loss_stats}
+    avg_loss_stats = None
     num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters
     bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
     end = time.time()
@@ -252,6 +258,9 @@ class Trainer(object):
       Bar.suffix = '{phase}: [{0}][{1}/{2}]|Tot: {total:} |ETA: {eta:} '.format(
         epoch, iter_id, num_iters, phase=phase,
         total=bar.elapsed_td, eta=bar.eta_td)
+
+      if avg_loss_stats is None:
+        avg_loss_stats = {l: AverageMeter() for l in loss_stats}
 
       # Logging step
       for l in loss_stats:

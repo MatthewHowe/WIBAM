@@ -255,8 +255,10 @@ class opts(object):
     self.parser.add_argument('--mv_weight', type=float, default=1)
     
     # Multi-view
-    self.parser.add_argument('--giou_thresh', type=float, default=-0.5,
-                            help='Threshold for compared GIoU')
+    # self.parser.add_argument('--giou_thresh', type=float, default=-0.5,
+    #                         help='Threshold for compared GIoU')
+    self.parser.add_argument('--show_repro', type=bool, default=False, 
+                            help='Show image reprojections')
 
     # custom dataset
     self.parser.add_argument('--custom_dataset_img_path', default='')
