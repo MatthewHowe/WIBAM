@@ -5,7 +5,6 @@ import torch.nn as nn
 from utils.ddd_utils import ddd2locrot
 import torch
 import math
-import shapely
 import cv2
 
 # def visually_check_calibration(batch, calib)

@@ -9,4 +9,5 @@ pyquaternion
 nuscenes-devkit
 pyyaml
 motmetrics
+random
 scikit-learn==0.22.2
