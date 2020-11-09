@@ -213,8 +213,6 @@ class WIBAM(GenericDataset):
     inp = cv2.warpAffine(img, trans_input,
                         (self.opt.input_w, self.opt.input_h),
                         flags=cv2.INTER_LINEAR)
-    # cv2.imshow("inp_w", inp)
-    # cv2.waitKey(0)
     inp = (inp.astype(np.float32) / 255.)
     inp = (inp - self.mean) / self.std
     

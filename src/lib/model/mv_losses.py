@@ -97,6 +97,7 @@ class ReprojectionLoss(nn.Module):
     self.opt = opt
 
   def forward(self, output, batch):
+    print("Calculating MV loss", end="\r")
     detections = {}
     calibrations = {}
     BN = len(batch['cam_num'])
