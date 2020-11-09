@@ -1,5 +1,5 @@
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/matthew/Documents/phd_projects/WIBAM_output_output_data-manager.json"
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/matthew/Documents/phd_projects/WIBAM_output_output_data-manager.json"
 
 from typing import List, Optional
 from pathlib import Path
