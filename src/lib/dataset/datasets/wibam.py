@@ -249,7 +249,10 @@ class WIBAM(GenericDataset):
     # Add original bbox for loss
     ret['bboxes'][cam][obj] = bbox_input
 
-    ret['obj_id'][cam][obj] = ann['obj_id']
+    if ann['obj_id'] is None:
+      ret['obj_id'][cam][obj] = -1
+    else:
+      ret['obj_id'][cam][obj] = ann['obj_id']
 
     ret['score'][cam][obj] = ann['score']
 

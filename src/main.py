@@ -5,6 +5,7 @@ from __future__ import print_function
 import _init_paths
 import os
 
+from pathlib import Path
 import torch
 import torch.utils.data
 from torch import nn
@@ -16,6 +17,8 @@ from logger import Logger
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import get_dataset
 from trainer import Trainer
+
+from utils.net import *
 
 def get_optimizer(opt, model):
   if opt.optim == 'adam':
@@ -46,7 +49,7 @@ def main(opt):
 
   # Initialise loggers
   logger = Logger(opt)
-  writer = SummaryWriter(opt.output_path)
+  writer = SummaryWriter(opt.save_dir)
 
   # Create model
   print('Creating model...')
@@ -101,12 +104,13 @@ def main(opt):
 
   print('Starting training...')
   for epoch in range(start_epoch + 1, opt.num_epochs + 1):
+    gsutil_sync(True, "aiml-reid-casr-data", Path(opt.save_dir), "", bucket_prefix_folder="wibam_output")
+
     mark = epoch if opt.save_all else 'last'
     
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
-                 epoch, model, optimizer)
-    
+                 epoch, model, optimizer)    
       with torch.no_grad():
         log_dict_val, preds = trainer.val(epoch, val_loader)
         if opt.eval_val:
@@ -114,30 +118,32 @@ def main(opt):
       for k, v in log_dict_val.items():
         logger.scalar_summary('val_{}'.format(k), v, epoch)
         logger.write('{} {:8f} | '.format(k, v))
-
     else:
       save_model(os.path.join(opt.save_dir, 'model_last.pth'), 
                  epoch, model, optimizer)
+      
 
     log_dict_train, _ = trainer.train(epoch, train_loader)
     logger.write('epoch: {} |'.format(epoch))
-
-    
 
     for k, v in log_dict_train.items():
       logger.scalar_summary('train_{}'.format(k), v, epoch)
       logger.write('{} {:8f} | '.format(k, v))
     
-    
     logger.write('\n')
     if epoch in opt.save_point:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)), 
                  epoch, model, optimizer)
+      
     if epoch in opt.lr_step:
       lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
       print('Drop LR to', lr)
       for param_group in optimizer.param_groups:
           param_group['lr'] = lr
+
+    # Sync with google clout
+    gsutil_sync(True, "aiml-reid-casr-data", Path("/"), opt.output_path)
+
   logger.close()
 
 if __name__ == '__main__':

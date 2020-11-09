@@ -238,38 +238,4 @@ class ReprojectionLoss(nn.Module):
         cv2.imshow("Batch {}".format(B), composite)
         cv2.waitKey(0)
 
-    #   # Drawing function
-    #   drawing_images = batch['drawing_images'].numpy()
-    #   # Draw centers
-    #   centers = detections['center'].cpu().detach().numpy().astype(int)
-    #   for B in range(BN):
-    #     for center in centers[B]:
-    #       cv2.circle(drawing_images[B,batch['cam_num'][B]], tuple(center), 3, (0,0,255), -1)
-
-    #   for B in range(BN):
-    #     num_matches = len(matched_det_loc[B])
-    #     if num_matches != 0:
-    #       colours, _, _ = generate_colors(num_matches)
-    #       for match in range(num_matches):
-    #         pr_ind = matched_det_loc[B][match]
-    #         obj_id = matched_obj_ids[B][match]
-    #         for cam in range(num_cams):
-    #           obj_id_list = batch['obj_id'][B][cam].tolist()
-    #           try:
-    #             gt_ind = obj_id_list.index(obj_id)
-    #           except:
-    #             continue
-    #           gt_box = batch['bboxes'][B,cam,gt_ind].cpu().detach().numpy().astype(int)
-    #           pr_box = detections['2D_bounding_boxes'][B,cam,pr_ind].cpu().detach().numpy().astype(int)
-    #           pr_3D_box = detections['proj_3D_boxes'][B,cam,pr_ind].cpu().detach().numpy()
-    #           img = drawing_images[B,cam]
-    #           draw_box_3d(img, pr_3D_box, colours[match])
-    #           cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[match], 2)
-    #           cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[match], 2)
-
-    #       cv2.namedWindow("GT and Predicted bounding boxes", cv2.WINDOW_NORMAL)
-    #       for image in drawing_images[B]:
-    #         cv2.imshow("GT and Predicted bounding boxes", image)
-    #         cv2.waitKey(0)
-
     return mv_loss

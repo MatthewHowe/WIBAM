@@ -11,3 +11,5 @@ pyyaml
 motmetrics
 random
 scikit-learn==0.22.2
+gs-wrap
+gsutil
