@@ -9,7 +9,6 @@ pyquaternion
 nuscenes-devkit
 pyyaml
 motmetrics
-random
 scikit-learn
 gs-wrap
 gsutil
