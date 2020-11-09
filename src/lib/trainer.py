@@ -241,6 +241,7 @@ class Trainer(object):
 
       # Run outputs for batch from model with losses
       # Loss is the total loss for the batch
+      print("Model with loss\r")
       output, loss, loss_stats = model_with_loss(batch)
 
       # Change backprop method from add to mean
@@ -248,6 +249,7 @@ class Trainer(object):
 
       # If training phase, back propogate the loss
       if phase == 'train':
+        print("Running backward\r")
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
