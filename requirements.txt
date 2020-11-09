@@ -10,6 +10,6 @@ nuscenes-devkit
 pyyaml
 motmetrics
 random
-scikit-learn==0.22.2
+scikit-learn==0.22
 gs-wrap
 gsutil

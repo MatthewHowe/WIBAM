@@ -32,6 +32,8 @@ def get_optimizer(opt, model):
   return optimizer
 
 def main(opt):
+  time_str = time.strftime('%Y-%m-%d-%H-%M')
+  tensorboard_dir = opt.save_dir + '/tensorboard_{}'.format(time_str)
   torch.manual_seed(opt.seed)
   torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
@@ -49,7 +51,7 @@ def main(opt):
 
   # Initialise loggers
   logger = Logger(opt)
-  writer = SummaryWriter(opt.save_dir)
+  writer = SummaryWriter(tensorboard_dir)
 
   # Create model
   print('Creating model...')

@@ -10,7 +10,7 @@ import torch
 import subprocess
 USE_TENSORBOARD = True
 try:
-  import tensorboardX
+  import tensorboardX 
   print('Using tensorboardX')
 except:
   USE_TENSORBOARD = False
@@ -24,6 +24,7 @@ class Logger(object):
       os.makedirs(opt.debug_dir)
    
     time_str = time.strftime('%Y-%m-%d-%H-%M')
+    log_dir = opt.save_dir + '/logs_{}'.format(time_str)
 
     args = dict((name, getattr(opt, name)) for name in dir(opt)
                 if not name.startswith('_'))
@@ -40,7 +41,7 @@ class Logger(object):
       for k, v in sorted(args.items()):
         opt_file.write('  %s: %s\n' % (str(k), str(v)))
           
-    log_dir = opt.save_dir + '/logs_{}'.format(time_str)
+    
     if USE_TENSORBOARD:
       self.writer = tensorboardX.SummaryWriter(log_dir=log_dir)
     else:
