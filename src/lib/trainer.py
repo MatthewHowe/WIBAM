@@ -6,7 +6,6 @@ import cv2
 import time
 import torch
 import numpy as np
-import torchviz as viz
 from progress.bar import Bar
 
 from model.data_parallel import DataParallel
