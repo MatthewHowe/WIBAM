@@ -144,9 +144,6 @@ def main(opt):
       for param_group in optimizer.param_groups:
           param_group['lr'] = lr
 
-    # Sync with google clout
-    gsutil_sync(True, "aiml-reid-casr-data", Path("/"), opt.output_path)
-
   logger.close()
 
 if __name__ == '__main__':
