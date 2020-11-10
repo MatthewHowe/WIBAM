@@ -97,7 +97,6 @@ class ReprojectionLoss(nn.Module):
     self.opt = opt
 
   def forward(self, output, batch):
-    print("Calculating MV loss", end="\r")
     detections = {}
     calibrations = {}
     BN = len(batch['cam_num'])
@@ -230,7 +229,7 @@ class ReprojectionLoss(nn.Module):
             mv_loss['det'] += loss
           else:
             mv_loss[cam] += loss  
-          mv_loss['tot'] += loss
+            mv_loss['tot'] += loss
 
     if self.opt.show_repro:
       for B in range(BN):
@@ -238,5 +237,6 @@ class ReprojectionLoss(nn.Module):
         cv2.namedWindow("Batch {}".format(B), cv2.WINDOW_NORMAL)
         cv2.imshow("Batch {}".format(B), composite)
         cv2.waitKey(0)
+
 
     return mv_loss

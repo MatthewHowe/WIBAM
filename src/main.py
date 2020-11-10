@@ -105,10 +105,8 @@ def main(opt):
   )
 
   print('Starting training...')
-  for epoch in range(start_epoch + 1, opt.num_epochs + 1):
-    print("Syncing gclout files", end="\r")
+  for epoch in range(start_epoch, opt.num_epochs + 1):
     gsutil_sync(True, "aiml-reid-casr-data", Path(opt.save_dir), "", bucket_prefix_folder="wibam_output")
-    print("Finished sync gclout")
     mark = epoch if opt.save_all else 'last'
     
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
@@ -125,7 +123,6 @@ def main(opt):
       save_model(os.path.join(opt.save_dir, 'model_last.pth'), 
                  epoch, model, optimizer)
       
-    print("Running epoch: {}".format(epoch), end="\r")
     log_dict_train, _ = trainer.train(epoch, train_loader)
     logger.write('epoch: {} |'.format(epoch))
 
