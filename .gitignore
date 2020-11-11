@@ -30,6 +30,11 @@ models/*
 model/*
 images/
 images/*
+validation_examples/*
+validation_examples/
+attached
+repro_zip/*
+
 src/.vscode/*
 src/paths.py
 preds/*
