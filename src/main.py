@@ -105,8 +105,9 @@ def main(opt):
   )
 
   print('Starting training...')
-  for epoch in range(start_epoch, opt.num_epochs + 1):
-    gsutil_sync(True, "aiml-reid-casr-data", Path(opt.save_dir), "", bucket_prefix_folder="wibam_output")
+  for epoch in range(start_epoch + 1, opt.num_epochs + 1):
+    gsutil_sync(True, "aiml-reid-casr-data", Path(opt.save_dir),
+                "", bucket_prefix_folder="wibam_output")
     mark = epoch if opt.save_all else 'last'
     
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:

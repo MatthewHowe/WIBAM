@@ -106,49 +106,52 @@ class ReprojectionLoss(nn.Module):
     decoded_output = decode_output(output, self.opt.K)
 
     # Post processing code
-    ctrs = torch.zeros((BN,max_objects,2)).to('cuda')
-    trans = get_affine_transform(
-      np.array([960,540]), 1920, 0, (200, 112), inv=1).astype(np.float32)
-    trans = torch.Tensor(trans).to('cuda')
+    trans = torch.Tensor(get_affine_transform(
+                np.array([960,540]), 1920, 0, (200, 112),
+                inv=1).astype(np.float32)).to('cuda')
 
-    homog = torch.ones(max_objects,1).to('cuda')
-    
-    for B in range(BN):
-      ct_output = decoded_output['bboxes'][B].reshape(max_objects,2, 2).mean(axis=1)
-      amodel_ct_output = ct_output + decoded_output['amodel_offset'][B]
-      cts = amodel_ct_output.reshape(max_objects, 2)
-      cts = torch.cat((cts,homog),1)
-      ctrs[B] = torch.mm(cts, trans.T)
+    centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
+    centers = centers + decoded_output['amodel_offset']
+    centers = torch.cat((centers.reshape(BN, max_objects, 2),
+                         torch.ones(BN, max_objects,1).to('cuda')),
+                         2)
+    centers = torch.matmul(centers, trans.T)
 
     # Put detections into their own dictionary with required information
     # Scale depth with focal length
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
-    detections['center'] = ctrs
-    calibrations['cam_num'] = batch['cam_num']
-    calibrations['P'] = batch['P']
-    calibrations['dist_coefs'] = batch['dist_coefs']
-    calibrations['tvec'] = batch['tvec']
-    calibrations['rvec'] = batch['rvec']
-    calibrations['theta_X_d'] = batch['theta_X_d']
-  
+    detections['center'] = centers
+
+
+    # calibrations['P'] = batch['P']
+    # calibrations['dist_coefs'] = batch['dist_coefs']
+    # calibrations['tvec'] = batch['tvec']
+    # calibrations['rvec'] = batch['rvec']
+    # calibrations['theta_X_d'] = batch['theta_X_d']
+    # for key, val in calibrations.items():
+    #   calibrations[key + '_det'] = torch.zeros(0,0,0)
+    #   for i in range(len(batch['cam_num'])):
+    #      calibrations[key + '_det'] = torch.cat((calibrations[key + '_det'],
+    #                                              val[i, batch['cam_num'][i]], 0)
+    # calibrations['cam_num'] = batch['cam_num']
+
     # Get predictions in camera.c.f loc(x,y,z), rot(alpha),size(l,w,h)
     # Adds them to detections dict
-    det_cam_to_det_3D_ccf(detections,calibrations)
+    det_cam_to_det_3D_ccf(detections,batch)
 
     # Put the predictions into world coordinate frame
     # Adds them to detections dict
-    dets_3D_ccf_to_dets_3D_wcf(detections, calibrations)
+    dets_3D_ccf_to_dets_3D_wcf(detections, batch)
 
     # Produce all the reprojections for every other camera
-    dets_3D_wcf_to_dets_2D(detections, calibrations)
+    dets_3D_wcf_to_dets_2D(detections, batch)
 
     # Get the ground truth centers
     gt_centers = batch['ctr'].type(torch.float)
-    for B in range(BN):
-      temp_gt = torch.cat((gt_centers[B], homog), 1)
-      gt_centers[B] = torch.mm(temp_gt, trans.T)
+    temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
+    gt_centers = torch.matmul(temp_gt, trans.T)
 
     cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
                           gt_centers, batch['mask'], batch['cam_num'])

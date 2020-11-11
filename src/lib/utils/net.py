@@ -1,5 +1,4 @@
 import os
-# os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/matthew/Documents/phd_projects/WIBAM_output_output_data-manager.json"
 
 from typing import List, Optional
 from pathlib import Path
@@ -28,9 +27,7 @@ from requests.exceptions import (
 
 client = gswrap.Client()
 
-
 logger = logging.getLogger("gcs-sync")
-
 
 def get_modified_date_or_none_gcs(url: str) -> Optional[datetime.datetime]:
     """

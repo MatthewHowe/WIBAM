@@ -133,11 +133,18 @@ class WIBAM(GenericDataset):
 
       # Get calibration information and put into np.arrays for collation
       P, dist_coefs, rvec, tvec, theta_X_d = self._get_calib(imgs_info)
-      ret['P'] = np.array(P)
+      ret['P'] = np.array(P).astype(np.float32)
       ret['dist_coefs'] = np.array(dist_coefs)
       ret['rvec'] = np.array(rvec)
       ret['tvec'] = np.array(tvec)
       ret['theta_X_d'] = np.array(theta_X_d)
+
+      ret['P_det'] = np.array(P[cam_num]).astype(np.float32)
+      ret['dist_coefs_det'] = np.array(dist_coefs[cam_num])
+      ret['rvec_det'] = np.array(rvec[cam_num])
+      ret['tvec_det'] = np.array(tvec[cam_num])
+      ret['theta_X_d_det'] = np.array(theta_X_d[cam_num])
+      
 
       # initialise gt dictionary
       gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}

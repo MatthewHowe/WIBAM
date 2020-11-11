@@ -75,6 +75,54 @@ def det_cam_to_det_3D_ccf(model_detections, calib):
 
   return model_detections
 
+def unproject_2d_to_3d(center, depth, calib):
+  r"""
+  Function takes argyment of the center location of object on frame
+  and the predicted depth of the object, then using the camera calibration
+  will get the x,y,z location of the objects.
+  Arguments:
+    center (tuple): Center location of object on camera frame
+      format: (u,v)
+    depth (float): Predicted depth of the object
+    calib (dict): dictionary of calibration information for camera
+      format: {P, dist_coefs, rvec, tvec, theta_X_d}
+  Returns:
+    location_3D (np.array, float32): location of the object in camera
+      coordinate frame
+      format: (x,y,z)
+  """
+
+  u = center[:,:,0]
+  v = center[:,:,1]
+
+  z = torch.squeeze(depth,-1)
+  x = ((u - calib['P_det'][:, 0, 2, None]) * z) / calib['P_det'][:, 0, 0, None]
+  y = ((v - calib['P_det'][:, 1, 2, None]) * z) / calib['P_det'][:, 1, 1, None]
+
+  return torch.stack((x,y,z)).permute(1,2,0).to(device='cuda')
+
+def get_alpha(bin_rotation):
+  r"""
+  Gets the multi-bin output and converts to a single angle alpha. CenterNet
+  implementation doesn't use bin#_cls[0].
+  Arguments:
+    bin_rotation (np.array, (batch_size,8)): multi-bin rotation prediction
+      format: [bin1_cls[0], bin1_cls[1], bin1_sin, bin1_cos, 
+               bin2_cls[0], bin2_cls[1], bin2_sin, bin2_cos]
+  Returns:
+    alpha (float): angle in radians of vehicle relative to camera
+  """
+  # True if bin1, else bin2
+  bin_index = bin_rotation[:, :, 1] > bin_rotation[:, :, 5]
+
+  pi =  torch.Tensor([math.pi]).to(device="cuda")
+
+  alpha_bin1 = torch.atan2(bin_rotation[:, :, 2], bin_rotation[:, :, 3]) + (-0.5 * pi)
+  alpha_bin2 = torch.atan2(bin_rotation[:, :, 6], bin_rotation[:, :, 7]) + ( 0.5 * pi)
+
+  # Return only the predicted bin ~ inverts mask
+  return alpha_bin1 * bin_index + alpha_bin2 * (~bin_index)
+
 def dets_3D_ccf_to_dets_3D_wcf(detections, calib):
   r"""
   Convert detections from camera coordinate frame to world coordinate
@@ -277,65 +325,6 @@ def det_3D_to_BBox_3D(detections, calib):
   detections['3D_bounding_boxes'] = bounding_box_3D.to(device='cuda')
 
   return detections
-
-def unproject_2d_to_3d(center, depth, calib):
-  r"""
-  Function takes argyment of the center location of object on frame
-  and the predicted depth of the object, then using the camera calibration
-  will get the x,y,z location of the objects.
-  Arguments:
-    center (tuple): Center location of object on camera frame
-      format: (u,v)
-    depth (float): Predicted depth of the object
-    calib (dict): dictionary of calibration information for camera
-      format: {P, dist_coefs, rvec, tvec, theta_X_d}
-  Returns:
-    location_3D (np.array, float32): location of the object in camera
-      coordinate frame
-      format: (x,y,z)
-  """
-  locations = torch.zeros((center.shape[0], 3, center.shape[1]))
-
-  for batch in range(center.shape[0]):
-    camera_number = int(calib['cam_num'][batch])
-    rvec = calib['rvec'][batch][camera_number].cpu().numpy()
-
-    P = calib['P'][batch][camera_number]
-
-    u = center[batch,:,0]
-    v = center[batch,:,1]
-
-    z = (depth[batch].reshape((center.shape[1])))
-    x = ((u - P[0, 2]) * z) / P[0, 0]
-    y = ((v - P[1, 2]) * z) / P[1, 1]
-
-    locations[batch][0] = x
-    locations[batch][1] = y 
-    locations[batch][2] = z
-
-  return locations.permute(0, 2, 1).contiguous().to(device='cuda')
-  
-def get_alpha(bin_rotation):
-  r"""
-  Gets the multi-bin output and converts to a single angle alpha. CenterNet
-  implementation doesn't use bin#_cls[0].
-  Arguments:
-    bin_rotation (np.array, (batch_size,8)): multi-bin rotation prediction
-      format: [bin1_cls[0], bin1_cls[1], bin1_sin, bin1_cos, 
-               bin2_cls[0], bin2_cls[1], bin2_sin, bin2_cos]
-  Returns:
-    alpha (float): angle in radians of vehicle relative to camera
-  """
-  # True if bin1, else bin2
-  bin_index = bin_rotation[:, :, 1] > bin_rotation[:, :, 5]
-
-  pi =  torch.Tensor([math.pi]).to(device="cuda")
-
-  alpha_bin1 = torch.atan2(bin_rotation[:, :, 2], bin_rotation[:, :, 3]) + (-0.5 * pi)
-  alpha_bin2 = torch.atan2(bin_rotation[:, :, 6], bin_rotation[:, :, 7]) + ( 0.5 * pi)
-
-  # Return only the predicted bin ~ inverts mask
-  return alpha_bin1 * bin_index + alpha_bin2 * (~bin_index)
 
 def _gather_feat(feat, ind):
   r"""
