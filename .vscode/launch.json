@@ -1,0 +1,226 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Demo tracking,detection - 01.MP4",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "tracking, ddd",
+                "--load_model=./models/nuScenes_3Dtracking.pth",
+                "--dataset=nuscenes",
+                "--pre_hm",
+                "--track_thresh=0.1",
+                "--demo=./videos/NE_LIN_MID_SYNC.mp4",
+                "--test_focal_length=1266"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Demo tracking,detection - nuscenes_mini",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "tracking,ddd",
+                "--load_model=./models/nuScenes_3Dtracking.pth",
+                "--dataset=nuscenes",
+                "--pre_hm",
+                "--track_thresh=0.1",
+                "--demo=./videos/nuscenes_mini.mp4",
+                "--test_focal_length=633",
+                "--save_video"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Demo detection - nuscenes_mini",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "ddd",
+                "--load_model=./models/nuScenes_3Ddetection_e140.pth",
+                "--dataset=nuscenes",
+                "--pre_hm",
+                "--demo=./videos/nuscenes_mini.mp4",
+                "--test_focal_length=633"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Demo detection - NE_LIN_MID_SYNC.mp4",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "ddd",
+                "--load_model=./models/nuScenes_3Ddetection_e140.pth",
+                "--dataset=wibam",
+                "--pre_hm",
+                "--demo=./videos/NE_LIN_MID_SYNC.mp4",
+                "--test_focal_length=1046",
+                "--resize_video",
+                "--video_w=1920",
+                "--video_h=1080",
+                "--depth_scale=0.82622"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Demo detection - NE_LIN_MID_SYNC.mp4 - KITTImodel",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "ddd",
+                "--load_model=./models/ddd_3dop_kitti.pth",
+                "--dataset=nuscenes",
+                "--pre_hm",
+                "--demo=./videos/NE_LIN_MID_SYNC.mp4",
+                "--test_focal_length=1030"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "convert kitti to coco",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/tools/convert_kitti_to_coco.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Validate kitti",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/test.py",
+            "args": [
+                "ddd",
+                "--exp_id=nuscenesdet",
+                "--dataset=kitti",
+                "--kitti_split=3dop",
+                "--load_model=./models/nuScenes_3Ddetection_e140.pth"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train kitti",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "ddd",
+                "--exp_id=TrainKitti",
+                "--dataset=kitti",
+                "--kitti_split=3dop",
+                "--batch_size=1",
+                "--num_epochs=70",
+                "--lr_step=45,60",
+                "--save_point=1,45,60,65",
+                "--val_intervals=5",
+                "--gpus=0",
+                "--load_model=models/ddd_3dop_kitti.pth"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "WIBAM Images",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "ddd",
+                "--load_model=./models/nuScenes_3Ddetection_e140.pth",
+                "--dataset=nuscenes",
+                "--pre_hm",
+                "--demo=./data/wibam/frames/0",
+                "--test_focal_length=1046"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train wibam",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "ddd",
+                "--exp_id=tensorboard_test_wibam",
+                "--dataset=wibam",
+                "--no_color_aug",
+                "--batch_size=4",
+                "--num_epochs=70",
+                "--lr_step=45,60",
+                "--save_point=1,45,60,65",
+                "--val_intervals=5",
+                "--gpus=0",
+                // "--show_repro=True",
+                "--load_model=models/wibam_output_train_dgx_model_2.pth",
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Test wibam",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "ddd",
+                "--exp_id=validation",
+                "--dataset=wibam",
+                "--no_color_aug",
+                "--batch_size=4",
+                "--num_epochs=70",
+                "--lr_step=45,60",
+                "--save_point=1,45,60,65",
+                "--val_intervals=1",
+                "--gpus=0",
+                "--show_repro=True",
+                "--load_model=exp/ddd/no_det_repro/model_1.pth",
+                // "--load_model=models/wibam_output_train_dgx_model_1.pth"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Train wibam - instance",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "args": [
+                "ddd",
+                "--instance_batching",
+                "--exp_id=train_wibam_instance",
+                "--dataset=wibam",
+                "--no_color_aug",
+                "--batch_size=4",
+                "--num_epochs=70",
+                "--lr_step=45,60",
+                "--save_point=1,45,60,65",
+                "--val_intervals=5",
+                "--gpus=0",
+                "--load_model=models/ddd_3dop_kitti.pth"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Images",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/demo.py",
+            "args": [
+                "ddd",
+                "--load_model=./models/ddd_3dop_kitti.pth",
+                "--dataset=kitti",
+                "--pre_hm",
+                "--demo=./images/kitti/training/image_2",
+                "--test_focal_length=645"
+            ],
+            "console": "integratedTerminal"
+        },
+    ]
+}
