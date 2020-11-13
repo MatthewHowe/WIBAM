@@ -13,7 +13,11 @@
 
 // author: Charles Shang
 // https://github.com/torch/cunn/blob/master/lib/THCUNN/generic/SpatialConvolutionMM.cu
+
 // modified from the CUDA version for CPU use by Daniel K. Suhendro
+
+// edit by: James Bockman and Matthew Howe
+// modified for torch implementation to remove use of deprecated torch access to Blas
 
 at::Tensor
 dcn_v2_cpu_forward(const at::Tensor &input,
@@ -80,36 +84,20 @@ dcn_v2_cpu_forward(const at::Tensor &input,
         // (see http://docs.nvidia.com/cuda/cublas/#cublas-lt-t-gt-gemm)
         // (N x 1) (1 x M)
 
-
-
-        // 13/11/20
+        // torch implementation
         auto ones_T = at::transpose(ones.contiguous(), 2, 0);
         ones_T = at::mul(ones_T, bias.contiguous());
         ones_T = at::transpose(ones_T, 2, 0);
         output_n = at::add(output_n, ones_T);
-        // std::cout << "output_n: " << output_n << "output.select(0,b): " << output.select(0,b) << "\n";
 
-
-        // 12/11/20
-        // auto ones_flat = ones.contiguous().view({1, height_out*width_out});
-        // auto flat_bias = bias.contiguous().view({channels_out, 1});
-        // auto ones_temp = at::mm(flat_bias,
-        //                         ones_flat);
-        // ones_temp = at::reshape(ones_temp, {channels_out, height_out, width_out});
-        // output_n = at::add(output_n, ones_temp);
-        
-        
-        // original
+        // ye olde code
         // long m_ = channels_out;
         // long n_ = height_out * widt;h_out;
         // long k_ = 1;
-        
         // THFloatBlas_gemm('t', 'n', n_, m_, k_, 1.0f,
         //                  ones.contiguous().data_ptr<scalar_t>(), k_,
         //                  bias.contiguous().data_ptr<scalar_t>(), k_, 0.0f,
         //                  output_n.data_ptr<scalar_t>(), n_);
-
-        // std::cout<< "Forward 1st post: ones: " << ones.sizes() << " bias: " << bias.sizes() << " outputN: " << output_n.sizes() << "\n\n";
 
         modulated_deformable_im2col_cpu(input_n.data_ptr<scalar_t>(),
                                          offset_n.data_ptr<scalar_t>(),
@@ -123,28 +111,12 @@ dcn_v2_cpu_forward(const at::Tensor &input,
         //(k * m)  x  (m * n)
         // Y = WC
 
-        // 13/11/20
-        // std::cout<< "Forward 2nd pre: columns: " << columns.sizes() << " weight: " << weight.sizes() << " outputN: " << output_n.sizes() << "\n";
+        // torch implementation
         auto weight_flat = weight.view({channels_out, channels * kernel_h * kernel_w});
         auto product = at::matmul(weight_flat, columns);
         output.select(0, b) = at::add(output_n, product.view({channels_out, height_out, width_out}));
 
-
-        // 12/11/20
-        // auto weight_flat = at::flatten(weight, -3, -1);
-        // output_n = at::flatten(output_n, -2, -1);
-
-
-        // output_n = at::addmm(output_n,
-        //           weight_flat,
-        //           columns,
-        //           1.0f, 1.0f);
-
-        // output_n = at::reshape(output_n, {channels_out, height_out, width_out});
-
-        // std::cout<< "Forward 2nd post: columns: " << columns.sizes() << " weight: " << weight.sizes() << " outputN: " << output_n.sizes() << "\n\n";
-        
-        // old code 
+        // ye olde code 
         // long m = channels_out;
         // long n = height_out * width_out;
         // long k = channels * kernel_h * kernel_w;
@@ -221,31 +193,13 @@ std::vector<at::Tensor> dcn_v2_cpu_backward(const at::Tensor &input,
 
 
 
-        // std::cout<< "Backward 1st: columns: " << columns.sizes() << " weight_flat: " << weight.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-        // printf("channels: %d, kernel_h: %d, kernel_w: %d, height_out: %d, width_out: %d, channels_out: %d\n", channels, kernel_h, kernel_w, height_out, width_out, channels_out);
-        // 13/11/20
+        // Torch implementation
         auto weight_flat = weight.view({channels_out, channels*kernel_h*kernel_w});
         weight_flat = at::transpose(weight_flat, 1, 0);
         auto grad_output_n_flat = grad_output_n.view({channels_out, height_out*width_out});
-        // No addition due to zero beta
-        // TODO: Check if this overrides memory 
         columns = at::matmul(weight_flat, grad_output_n_flat);
 
-        // 12/11/20
-        // grad_output_n = at::flatten(grad_output_n, -2, -1);
-        // auto weight_flat = at::flatten(weight, -3, -1);
-        // weight_flat = at::transpose(weight_flat, 1, 0);
-
-
-
-        // auto columns_flat = at::addmm(columns,
-        //                     weight_flat,
-        //                     grad_output_n,
-        //                     0.0f,1.0f);
-
-        // std::cout<< "Backward after 1st: columns: " << columns_flat.sizes() << " weight_flat: " << weight_flat.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-
-        // Ye Olde code
+        // ye olde code
         // long m = channels * kernel_h * kernel_w;
         // long n = height_out * width_out;
         // long k = channels_out;
@@ -285,37 +239,11 @@ std::vector<at::Tensor> dcn_v2_cpu_backward(const at::Tensor &input,
                                          dilation_h, dilation_w, deformable_group,
                                          columns.data_ptr<scalar_t>());
 
-        
-
-        // std::cout<< "Backward 2st: columns: " << columns.sizes() << " grad_weight: " << grad_weight.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-        // printf("channels_out: %d, channels: %d, kernel_h: %d, kernel_w: %d, height_out: %d, width_out: %d\n", channels_out, channels, kernel_h, kernel_w, height_out, width_out);
-        
-        // 13/11/20
-        // Already flattedned grad_output_n
+        // Torch implementation
         auto product = at::matmul(grad_output_n_flat, at::transpose(columns, 1, 0));
         grad_weight = at::add(grad_weight, product.view({channels_out, channels, kernel_h, kernel_w}));
 
-        // 12/11/20
-        // auto grad_weight_shape = grad_weight.sizes();
-        // columns_flat = at::transpose(columns_flat, 1, 0);
-        // // auto grad_weight_flat = at::flatten(grad_weight, -3, -1);
-
-        // auto grad_weight_temp = at::mm(grad_output_n, columns_flat);
-        // grad_weight_temp = at::reshape(grad_weight_temp, grad_weight_shape);
-        // grad_weight = at::add(grad_weight, grad_weight_temp);
-
-
-        // grad_weight_flat = at::addmm(grad_weight_flat,
-        //                         grad_output_n,
-        //                         columns_flat,
-        //                         1.0f,1.0f);
-
-        // grad_weight_flat = at::reshape(grad_weight_flat, grad_weight_shape);
-        
-
-        // std::cout<< "Backward 2st: columns: " << columns_flat.sizes() << " grad_weight_flat: " << grad_weight_temp.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-
-        // Ye olde code
+        // ye olde code
         // long m_ = channels_out;
         // long n_ = channels * kernel_h * kernel_w;
         // long k_ = height_out * width_out;
@@ -324,52 +252,12 @@ std::vector<at::Tensor> dcn_v2_cpu_backward(const at::Tensor &input,
         //                  grad_output_n.data_ptr<scalar_t>(), k_, 1.0f,
         //                  grad_weight.data_ptr<scalar_t>(), n_);
 
-        // gradient w.r.t. bias
-        // long m_ = channels_out;
-        // long k__ = height_out * width_out;
-        // mv
-        // const CBLAS_LAYOUT Layout ,
-        //       const CBLAS_TRANSPOSE trans ,
-        //       const MKL_INT m , const MKL_INT n ,
-        //       const float alpha , const float *a , const MKL_INT lda , const float *x , const MKL_INT incx , const float beta , float *y , const MKL_INT incy
-        //
-        // mm
-        // const CBLAS_LAYOUT Layout ,
-        // const CBLAS_TRANSPOSE transa , const CBLAS_TRANSPOSE transb ,
-        //       const MKL_INT m , const MKL_INT n , const MKL_INT k ,
-        //       const float alpha , const float *a , const MKL_INT lda , const float *b , const MKL_INT ldb , const float beta , float *c , const MKL_INT ldc
-        // void THFloatBlas_gemm(char, char, int64_t, int64_t, int64_t, float, float*, int64_t, float*, int64_t, float, float*, int64_t)
-        // the following are equivalent: 
-        // ?gemv('T',        M, N, a,       A, M, X, 1, b, Y, 1)
-        // ?gemm('N','N', 1, N, M, a, X, 1, A, M,       b, Y, 1)
-        // THFloatBlas_gemv('t', k_, m_, 1.0f,
-        //                  grad_output_n.data_ptr<scalar_t>(), k_,
-        //                  ones.data_ptr<scalar_t>(), 1, 1.0f,
-        //                  grad_bias.data_ptr<scalar_t>(), 1);
-        // auto a = 1.0f;
-        // auto A = grad_output_n.data_ptr<scalar_t>();
-        // auto X = ones.data_ptr<scalar_t>();
-        // auto Y = grad_bias.data_ptr<scalar_t>();
-
-        // std::cout<< "Backward 3st: grad_bias: " << grad_bias.sizes() << " ones: " << ones.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-
-        // 13/11/20
+        // Torch implementation
         auto ones_flat = ones.view({height_out*width_out});
         product = at::matmul(grad_output_n_flat, ones_flat);
         grad_bias = at::add(grad_bias, product);
 
-        // 12/11/20       
-        // // grad_output_n = at::transpose(grad_output_n, 1, 0);
-        // auto ones_flat = at::flatten(ones, 0, -1);
-
-
-        // grad_bias = at::addmv(grad_bias,
-        //                       grad_output_n,
-        //                       ones_flat,
-        //                       1.0f, 1.0f);
-
-        // std::cout<< "Backward 3st: grad_bias: " << grad_bias.sizes() << " ones: " << ones.sizes() << " grad_output_n: " << grad_output_n.sizes() << "\n";
-
+        // ye olde code
         // THFloatBlas_gemm('N', 'N', 1, m_, k_, 1.0f,
         //                  ones.data_ptr<scalar_t>(), 1,
         //                  grad_output_n.data_ptr<scalar_t>(), k_,
