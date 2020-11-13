@@ -63,6 +63,7 @@ def check_zero_offset():
         print('Zero offset passed')
     else:
         print('Zero offset failed')
+        print("max error: {}".format(d))
         print(input)
         print(output)
 
