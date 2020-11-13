@@ -124,19 +124,6 @@ class ReprojectionLoss(nn.Module):
     detections['rot'] = decoded_output['rot']
     detections['center'] = centers
 
-
-    # calibrations['P'] = batch['P']
-    # calibrations['dist_coefs'] = batch['dist_coefs']
-    # calibrations['tvec'] = batch['tvec']
-    # calibrations['rvec'] = batch['rvec']
-    # calibrations['theta_X_d'] = batch['theta_X_d']
-    # for key, val in calibrations.items():
-    #   calibrations[key + '_det'] = torch.zeros(0,0,0)
-    #   for i in range(len(batch['cam_num'])):
-    #      calibrations[key + '_det'] = torch.cat((calibrations[key + '_det'],
-    #                                              val[i, batch['cam_num'][i]], 0)
-    # calibrations['cam_num'] = batch['cam_num']
-
     # Get predictions in camera.c.f loc(x,y,z), rot(alpha),size(l,w,h)
     # Adds them to detections dict
     det_cam_to_det_3D_ccf(detections,batch)
