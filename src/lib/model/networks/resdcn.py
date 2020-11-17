@@ -15,12 +15,13 @@ import logging
 
 import torch
 import torch.nn as nn
+from DCN.dcn_v2 import DCN
 
-try:
-  from .DCNv2.dcn_v2 import DCN
-except:
-  print('Import DCN failed')
-  DCN = None
+# try:
+  
+# except:
+#   print('Import DCN failed in resdcn.py')
+#   DCN = None
 import torch.utils.model_zoo as model_zoo
 from .base_model import BaseModel
 
