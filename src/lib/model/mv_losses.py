@@ -97,6 +97,7 @@ class ReprojectionLoss(nn.Module):
     self.opt = opt
 
   def forward(self, output, batch):
+    sT = time.time()
     detections = {}
     calibrations = {}
     BN = len(batch['cam_num'])
@@ -104,7 +105,9 @@ class ReprojectionLoss(nn.Module):
     num_cams = batch['P'].shape[1]
 
     decoded_output = decode_output(output, self.opt.K)
-
+    total_T = time.time() - sT
+    print("preproccessing time: {}".format(total_T))
+    sT = time.time()
     # Post processing code
     trans = torch.Tensor(get_affine_transform(
                 np.array([960,540]), 1920, 0, (200, 112),
@@ -116,7 +119,8 @@ class ReprojectionLoss(nn.Module):
                          torch.ones(BN, max_objects,1).to('cuda')),
                          2)
     centers = torch.matmul(centers, trans.T)
-
+    total_T = time.time() - sT
+    print("calc centers time: {}".format(total_T))
     # Put detections into their own dictionary with required information
     # Scale depth with focal length
     detections['depth'] = decoded_output['dep'] * 1046/1266
@@ -146,9 +150,12 @@ class ReprojectionLoss(nn.Module):
     dets_3D_ccf_to_dets_3D_wcf(detections, batch)
 
     # Produce all the reprojections for every other camera
+    sT = time.time()
     dets_3D_wcf_to_dets_2D(detections, batch)
+    print("dets_3D_wcf_to_dets_2D time: {}".format(time.time()-sT))
 
     # Get the ground truth centers
+    sT = time.time()
     gt_centers = batch['ctr'].type(torch.float)
     temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
     gt_centers = torch.matmul(temp_gt, trans.T)
@@ -156,6 +163,9 @@ class ReprojectionLoss(nn.Module):
     cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
                           gt_centers, batch['mask'], batch['cam_num'])
     empty = []
+    total_T = time.time() - sT
+    print("Matching time: {}".format(total_T))
+    sT = time.time()
     gt_matched_boxes = [[empty.copy()]*num_cams]*BN 
     pr_matched_boxes = [[empty.copy()]*num_cams]*BN 
     ddd_matched_boxes = [[empty.copy()]*num_cams]*BN
@@ -221,6 +231,9 @@ class ReprojectionLoss(nn.Module):
                 cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[pr_index], 2)
                 cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
+    total_T = time.time() - sT
+    print("Collating matching boxes time: {}".format(total_T))
+    sT = time.time()
     # Calculate GIoU for all matches
     for B in range(BN):
       for cam in range(num_cams):
@@ -233,7 +246,8 @@ class ReprojectionLoss(nn.Module):
           else:
             mv_loss[cam] += loss  
             mv_loss['tot'] += loss
-
+    total_T = time.time() - sT
+    print("Calculating loss time: {}".format(total_T))
     if self.opt.show_repro:
       for B in range(BN):
         composite = return_four_frames(drawing_images[B])

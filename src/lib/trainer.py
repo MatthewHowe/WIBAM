@@ -211,6 +211,7 @@ class Trainer(object):
   def run_epoch(self, phase, epoch, data_loader):
     model_with_loss = self.model_with_loss
     if phase == 'train':
+
       model_with_loss.train()
     else:
       if len(self.opt.gpus) > 1:

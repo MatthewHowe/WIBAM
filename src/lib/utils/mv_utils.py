@@ -5,9 +5,8 @@ import torch.nn as nn
 from utils.ddd_utils import ddd2locrot
 import torch
 import math
+import time
 import cv2
-
-# def visually_check_calibration(batch, calib)
 
 def test_calculations(batch, calib):
   location_wcf = np.array([10,10,1.25]).reshape((3,1))
@@ -184,83 +183,43 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
   # Convert 3D detections to 3D bounding boxes
   det_3D_to_BBox_3D(detections, calib)
 
-  # Repeat process for each detection
   for batch in range(BN):
     for cam in range(num_cams):
-      for obj in range(objs):
-        # Project 3D bounding box points to camera frame points
-        bounding_box_wcf = detections['3D_bounding_boxes'][batch][obj]
-        P = calib['P'][batch][cam]
-        rvec = calib['rvec'][batch][cam]
-        R_wc = cv2.Rodrigues(rvec.cpu().numpy())[0]
-        R_wc = torch.Tensor(R_wc).to(device="cuda")
-        tvec = calib['tvec'][batch][cam]
+      P = calib['P'][batch][cam]
+      rvec = calib['rvec'][batch][cam]
+      R_wc = cv2.Rodrigues(rvec.cpu().numpy())[0]
+      R_wc = torch.Tensor(R_wc).to(device="cuda")
+      tvec = calib['tvec'][batch][cam]
 
-        bounding_box_wcf = bounding_box_wcf.transpose(0,1)
-        bounding_box_ccf = torch.add(torch.mm(R_wc, bounding_box_wcf), tvec)
+      bounding_box_wcf = detections['3D_bounding_boxes'][batch]
+      bounding_box_wcf = bounding_box_wcf.transpose(-2,-1)
+      bounding_box_ccf = torch.matmul(R_wc, bounding_box_wcf)
+      bounding_box_ccf = torch.add(bounding_box_ccf, tvec)
 
-        bounding_box_cam = torch.mm(P, bounding_box_ccf)
+      bounding_box_cam = torch.matmul(P, bounding_box_ccf)
 
-        bounding_box_cam = torch.div(bounding_box_cam,bounding_box_cam[2])
+      bounding_box_cam = torch.div(bounding_box_cam[:],
+                                   bounding_box_cam[:,2][:,None,:])
 
-        bounding_box_cam = bounding_box_cam[:2].transpose(0,1)
+      bounding_box_cam = bounding_box_cam[:,:2].transpose(-2,-1)
 
-        detections_projected3Dbb[batch][cam][obj] = bounding_box_cam
+      detections_projected3Dbb[batch][cam] = bounding_box_cam
 
-        # Find the minimum rectangle fit around the 3D bounding box
-        min_x, min_y = torch.min(bounding_box_cam, axis=0)[0]
-        max_x, max_y = torch.max(bounding_box_cam, axis=0)[0]
+      # Find the minimum rectangle fit around the 3D bounding box
+      min_bb = torch.min(bounding_box_cam, axis=1)[0]
+      max_bb = torch.max(bounding_box_cam, axis=1)[0]
 
-        # Append result to list
-        # TODO: Problem with autograd at this point creating new tensor
-        detections_2D[batch][cam][obj][0] = min_x
-        detections_2D[batch][cam][obj][1] = min_y
-        detections_2D[batch][cam][obj][2] = max_x-min_x
-        detections_2D[batch][cam][obj][3] = max_y-min_y
+      # Append result to list
+      # TODO: Problem with autograd at this point creating new tensor
+      detections_2D[batch,cam,:,0] = min_bb[:,0]
+      detections_2D[batch,cam,:,1] = min_bb[:,1]
+      detections_2D[batch,cam,:,2] = max_bb[:,0]-min_bb[:,0]
+      detections_2D[batch,cam,:,3] = max_bb[:,1]-min_bb[:,1]
 
   detections['proj_3D_boxes'] = detections_projected3Dbb
   detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
 
   return detections
-
-# Function to get rotation matrix fiven three rotations
-def get_rotation_matrix(rotations, degrees=True):
-  r"""
-  Creates a 3x3 rotation matrix from three angles given in
-  tuple/array format
-  Arguments:
-      rot: three angles given in tuple or array format (float)
-          format: (rot_x,rot_y,rot_z)
-      degrees: Whether or not angles are given in degrees (bool)
-          format: bool
-  Returns:
-      R: 3x3 rotation matrix (numpy 2D array)
-  """
-
-  if degrees:
-      rotations *= math.pi/180
-
-  X_rotation = np.array([
-    [1, 0, 0],
-    [0, math.cos(rotations[0]), math.sin(rotations[0])],
-    [0,-math.sin(rotations[0]), math.cos(rotations[0])]
-  ])
-
-  Y_rotation = np.array([
-    [math.cos(rotations[1]), 0,-math.sin(rotations[1])],
-    [0, 1, 0],
-    [math.sin(rotations[1]), 0, math.cos(rotations[1])]
-  ])
-
-  Z_rotation = np.array([
-    [math.cos(rotations[2]),-math.sin(rotations[2]), 0],
-    [math.sin(rotations[2]), math.cos(rotations[2]), 0],
-    [0,0,1]
-  ])
-
-  R = np.dot(X_rotation, Y_rotation)
-  R = np.dot(R, Z_rotation)
-  return R
 
 def det_3D_to_BBox_3D(detections, calib):
   r"""
@@ -279,48 +238,45 @@ def det_3D_to_BBox_3D(detections, calib):
   bounding_box_3D = torch.zeros((BN, objs, 8, 3))
 
   for batch in range(BN):
-    for obj in range(objs):
-      h, w, l = detections['size'][batch,obj]
-      alpha = detections['alpha'][batch,obj]
-      loc = detections['location_wcf'][batch,obj].reshape((3,1)).cpu()
-      cam = calib['cam_num'][batch]
-      P = calib['P'][batch][cam]
-      center_x = P[0,2]
-      f_x = P[0,0]
-      ct = detections['center'][batch][obj]
-      # Get rotation around Z axis
-      # rotation_z = calib['theta_X_d'][batch][cam]*math.pi/180 + 0 + torch.atan((ct[0]-center_x)/f_x)
-      
-      rotation_camera = calib['theta_X_d'][batch][cam]*math.pi/180 - math.pi/2
-      rotation_object = alpha + torch.atan((ct[0]-center_x)/f_x)
-      if rotation_object > np.pi:
-        rotation_object -= 2 * np.pi
-      if rotation_object < -np.pi:
-        rotation_object += 2 * np.pi
-      rotation_z = rotation_camera - rotation_object
-      rotation_matrix = get_rotation_matrix(np.array([0,0,rotation_z]), False)
-      rotation_matrix = torch.Tensor(rotation_matrix)
+    rotation_camera = calib['theta_X_d_det'][batch]*math.pi/180 - math.pi/2
+    P = calib['P_det'][batch]
+    center_x = P[0,2]
+    f_x = P[0,0]
 
-      # Get bounding box points
-      bounding_box_3D_points = torch.Tensor([
-        [l/2, -w/2,-h/2],
-        [l/2,  w/2,-h/2],
-        [-l/2, w/2,-h/2],
-        [-l/2,-w/2,-h/2],
-        [l/2, -w/2, h/2],
-        [l/2,  w/2, h/2],
-        [-l/2, w/2, h/2],
-        [-l/2,-w/2, h/2]
-      ]).transpose(0,1)
 
-      # Rotate bounding box
-      bounding_box_3D_points = torch.mm(rotation_matrix, bounding_box_3D_points)
+    h, w, l = detections['size'][batch].transpose(-1,-2)
+    h, w, l = h[:, None], w[:, None], l[:, None]
+    x_corners = torch.cat(( l/2,  l/2, -l/2, -l/2,  l/2, l/2, -l/2, -l/2), 1)
+    y_corners = torch.cat((-w/2,  w/2,  w/2, -w/2, -w/2, w/2,  w/2, -w/2), 1)
+    z_corners = torch.cat((-h/2, -h/2, -h/2, -h/2,  h/2, h/2,  h/2,  h/2), 1)
+    points = torch.stack((x_corners, y_corners, z_corners), 1)
 
-      # Translate bounding box
-      bounding_box_3D_points = torch.add(bounding_box_3D_points, loc)
+    alpha = detections['alpha'][batch]
+    ct = detections['center'][batch]
+    rotation_object = alpha + torch.atan((ct[:,0]-center_x)/f_x)
+    rotation_object = torch.where(rotation_object > np.pi, 
+                                  rotation_object - 2 * np.pi, 
+                                  rotation_object)
+    rotation_object = torch.where(rotation_object < -np.pi, 
+                                  rotation_object + 2 * np.pi, 
+                                  rotation_object)
+    rotation_object = rotation_camera - rotation_object
+    c, s = torch.cos(rotation_object), torch.sin(rotation_object)
+    rotation_matrix = torch.zeros((objs, 3, 3))
+    rotation_matrix[:, 0, 0] = c
+    rotation_matrix[:, 0, 1] = -s
+    rotation_matrix[:, 1, 0] = s
+    rotation_matrix[:, 1, 1] = c
+    rotation_matrix[:, 2, 2] = 1
+    rotation_matrix = rotation_matrix.to(device='cuda')
 
-      # Append to return variable
-      bounding_box_3D[batch,obj] = torch.transpose(bounding_box_3D_points, 0, 1)
+    points = torch.bmm(rotation_matrix, points)
+    location = detections['location_wcf'][batch][:,:,None]
+    points_a = torch.add(points, location)
+
+    points_b = torch.transpose(points_a, -2, -1)
+  
+    bounding_box_3D[batch] = points_b
 
   detections['3D_bounding_boxes'] = bounding_box_3D.to(device='cuda')
 
@@ -381,7 +337,6 @@ def _topk_channel(scores, K=100):
 
   return topk_scores, topk_inds, topk_ys, topk_xs
 
-# Finds top 100 objects on heatmap
 def _topk(scores, K=100):
   batch, cat, height, width = scores.size()
     
@@ -522,20 +477,18 @@ def get_dir(src_point, rot_rad):
 
 def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams):
   num_preds = predicted_centers.shape
-  num_gt = gt_centers.shape[1] 
   init_value = 1000000
   match_indexes = np.zeros((num_preds[0],num_preds[1]), dtype=int)
-  cost_matrix = np.full((num_preds[0], num_preds[1], num_gt), init_value, dtype=float)
+  match_indexes = np.zeros((num_preds[0],num_preds[1]), dtype=int)
+  
+  cost_matrix = torch.cdist(predicted_centers, gt_centers, p=2.0).cpu().detach().numpy()
+
   for batch in range(num_preds[0]):
-    # Produce cost matrix
-    for i in range(num_preds[1]):
-      for j in range(num_gt):
-        if gt_mask[batch,cams[batch],j] != 0:
-          cost_matrix[batch,i,j] = torch.norm(predicted_centers[batch, i]-gt_centers[batch, j])
+    mask = gt_mask[batch,cams[batch]].cpu().detach().numpy()
+    cost_matrix[batch, :] = cost_matrix[batch, :] * mask + np.bitwise_not(mask) * init_value
 
     row_indxs, col_indxs = linear_sum_assignment(cost_matrix[batch])
     match_indexes[batch] = col_indxs
-    
 
   return cost_matrix, match_indexes
 

@@ -133,7 +133,7 @@ class WIBAM(GenericDataset):
 
       # Get calibration information and put into np.arrays for collation
       P, dist_coefs, rvec, tvec, theta_X_d = self._get_calib(imgs_info)
-      ret['P'] = np.array(P).astype(np.float32)
+      ret['P'] = np.array(P).astype(np.float64)
       ret['dist_coefs'] = np.array(dist_coefs)
       ret['rvec'] = np.array(rvec)
       ret['tvec'] = np.array(tvec)
@@ -321,7 +321,7 @@ class WIBAM(GenericDataset):
     ret['score'] = np.zeros((num_cams, max_objs), dtype=np.float32)
 
     # Masks
-    ret['mask'] = np.zeros((num_cams, max_objs), dtype=np.float32)  
+    ret['mask'] = np.zeros((num_cams, max_objs), dtype=np.bool)  
 
     # Bounding boxes
     ret['bboxes'] = np.zeros((num_cams, max_objs, 4), dtype=np.float32)
