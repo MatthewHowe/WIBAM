@@ -5,7 +5,7 @@ centertrack_models/*
 */slurm-*.out
 src/slurm/
 results/*
-src/lib/models/networks/DCNv2
+# src/lib/models/networks/DCNv2
 src/lib/models/networks/DCNv2_04
 src/lib/models/networks/DCNv2_10
 # src/lib/model/networks/DCNv2
@@ -34,6 +34,7 @@ validation_examples/*
 validation_examples/
 attached
 repro_zip/*
+experiments/*
 
 src/.vscode/*
 src/paths.py
@@ -45,7 +46,7 @@ preds/*
 __pycache__/
 *.py[cod]
 *$py.class
-
+*pyc
 # C extensions
 *.so
 
