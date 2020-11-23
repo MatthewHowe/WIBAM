@@ -264,9 +264,13 @@ class Trainer(object):
 
       # Logging step
       for l in loss_stats:
-        if 0 not in loss_stats[l]:
+        try:
+          loss_val = torch.mean(loss_stats[l]).item()
+        except:
+          continue
+        if loss_val != 0:
           avg_loss_stats[l].update(
-            loss_stats[l].mean().item(), batch['image'].size(0)
+            loss_val, batch['image'].size(0)
           )
           Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
 
