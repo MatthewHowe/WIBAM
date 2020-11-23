@@ -264,6 +264,7 @@ class Trainer(object):
 
       # Logging step
       for l in loss_stats:
+        print("Log stats l: {}".format(l))
         if loss_stats[l] != 0:
           avg_loss_stats[l].update(
             loss_stats[l].mean().item(), batch['image'].size(0)
@@ -275,9 +276,9 @@ class Trainer(object):
             continue
           else:
             if phase == "train":
-              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_train)
+              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_train)
             elif phase == "val":
-              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].avg, self.total_steps_val)
+              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_val)
       Bar.suffix = Bar.suffix + '|Data {dt.val:.3f}s({dt.avg:.3f}s) ' \
         '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar

@@ -112,7 +112,7 @@ def main(opt):
     
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
-                 epoch, model, optimizer)    
+                 epoch, model, optimizer)     
       with torch.no_grad():
         log_dict_val, preds = trainer.val(epoch, val_loader)
         if opt.eval_val:
