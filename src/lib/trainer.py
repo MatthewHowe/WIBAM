@@ -263,7 +263,6 @@ class Trainer(object):
         avg_loss_stats = {l: AverageMeter() for l in loss_stats}
 
       # Logging step
-      print("Loss stats: {}".format(loss_stats))
       for l in loss_stats:
         if 0 not in loss_stats[l]:
           avg_loss_stats[l].update(
