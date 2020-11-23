@@ -265,7 +265,7 @@ class Trainer(object):
       # Logging step
       print("Loss stats: {}".format(loss_stats))
       for l in loss_stats:
-        if loss_stats[l] != 0:
+        if 0 not in loss_stats[l]:
           avg_loss_stats[l].update(
             loss_stats[l].mean().item(), batch['image'].size(0)
           )
