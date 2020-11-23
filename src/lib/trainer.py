@@ -263,8 +263,8 @@ class Trainer(object):
         avg_loss_stats = {l: AverageMeter() for l in loss_stats}
 
       # Logging step
+      print("Loss stats: {}".format(loss_stats))
       for l in loss_stats:
-        print("Log stats l: {}".format(loss_stats[l]))
         if loss_stats[l] != 0:
           avg_loss_stats[l].update(
             loss_stats[l].mean().item(), batch['image'].size(0)
