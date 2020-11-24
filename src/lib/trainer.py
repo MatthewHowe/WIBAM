@@ -6,7 +6,7 @@ import cv2
 import time
 import torch
 import numpy as np
-from progress.bar import ChargingBar as Bar
+from progress.bar import Bar as Bar
 
 from model.data_parallel import DataParallel
 from utils.utils import AverageMeter
