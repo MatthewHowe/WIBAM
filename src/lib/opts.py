@@ -145,7 +145,7 @@ class opts(object):
     self.parser.add_argument('--dense_reg', type=int, default=1, help='')
     self.parser.add_argument('--norm_function', default='BN', help='BN or GN')
     self.parser.add_argument('--no_det', action='store_true', help="Use detection camera multi-view loss")
-    self.parser.add_argument('--MVOnly', action='store_true', help="Use only Multiview loss in training")
+    self.parser.add_argument('--mv_only', action='store_true', help="Use only Multiview loss in training")
 
     # test
     self.parser.add_argument('--flip_test', action='store_true',
