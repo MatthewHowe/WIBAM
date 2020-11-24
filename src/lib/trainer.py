@@ -19,8 +19,6 @@ from model.utils import _sigmoid, flip_tensor, flip_lr_off, flip_lr
 from utils.debugger import Debugger
 from utils.post_process import generic_post_process
 
-
-
 class GenericLoss(torch.nn.Module):
   def __init__(self, opt):
     super(GenericLoss, self).__init__()
@@ -250,11 +248,9 @@ class Trainer(object):
       # Loss is the total loss for the batch
       output, loss, loss_stats = model_with_loss(batch)
 
-      # Change backprop method from add to mean
-      loss = loss.mean()
-
       # If training phase, back propogate the loss
       if phase == 'train':
+        loss = loss.mean()
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
