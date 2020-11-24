@@ -6,7 +6,7 @@ import cv2
 import time
 import torch
 import numpy as np
-from progress.bar import Bar
+from progress.bar import ChargingBar as Bar
 
 from model.data_parallel import DataParallel
 from utils.utils import AverageMeter
@@ -129,9 +129,12 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    # losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
-    losses = {'mv':0, 'tot':0}
-
+    if self.opt.MVOnly:
+      losses = {'mv':0, 'tot':0}
+    else:
+      losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    
+    
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
       output = outputs[s]
@@ -144,19 +147,20 @@ class MultiviewLoss(torch.nn.Module):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]
         mask[i] = batch['mask'][i][batch['cam_num'][i]]
 
-      # regression_heads = ['reg', 'wh']
+      if not self.opt.MVOnly:
+        regression_heads = ['reg', 'wh']
 
-      # for head in regression_heads:
-      #   if head in output:
-      #     losses[head] += self.RegWeightedL1Loss(
-      #       output[head], batch[head + '_mask'],
-      #       batch['ind'], batch[head]) / opt.num_stacks
+        for head in regression_heads:
+          if head in output:
+            losses[head] += self.RegWeightedL1Loss(
+              output[head], batch[head + '_mask'],
+              batch['ind'], batch[head]) / opt.num_stacks
 
-      # Heatmap loss
-      # if 'hm' in output:
-      #   losses['hm'] += self.FastFocalLoss(
-      #     output['hm'], batch['hm'], batch['ind'],
-      #     mask, cat) / opt.num_stacks
+        # Heatmap loss
+        if 'hm' in output:
+          losses['hm'] += self.FastFocalLoss(
+            output['hm'], batch['hm'], batch['ind'],
+            mask, cat) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
@@ -273,7 +277,7 @@ class Trainer(object):
           avg_loss_stats[l].update(
             loss_val, batch['image'].size(0)
           )
-          Bar.suffix = Bar.suffix + '|{} {:.4f} '.format(l, avg_loss_stats[l].avg)
+          Bar.suffix = Bar.suffix + '|{} {:.2f} '.format(l, avg_loss_stats[l].avg)
 
           # Tensorboard log
           if l == "amodel_offset":
@@ -283,8 +287,7 @@ class Trainer(object):
               self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_train)
             elif phase == "val":
               self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_val)
-      Bar.suffix = Bar.suffix + '|Data {dt.val:.3f}s({dt.avg:.3f}s) ' \
-        '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
+      Bar.suffix = Bar.suffix + '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar
         if iter_id % opt.print_iter == 0:
           print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix)) 

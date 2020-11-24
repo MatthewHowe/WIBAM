@@ -36,7 +36,8 @@ class opts(object):
                              help='resume an experiment. '
                                   'Reloaded the optimizer parameter and '
                                   'set load_model to model_last.pth '
-                                  'in the exp dir if load_model is empty.') 
+                                  'in the exp dir if load_model is empty.')
+    self.parser.add_argument('--gs_sync', default=True, help='Whether or not to sync to google cloud')
 
     # system
     self.parser.add_argument('--gpus', default='0', 
@@ -143,6 +144,8 @@ class opts(object):
     self.parser.add_argument('--add_05', action='store_true')
     self.parser.add_argument('--dense_reg', type=int, default=1, help='')
     self.parser.add_argument('--norm_function', default='BN', help='BN or GN')
+    self.parser.add_argument('--no_det', action='store_true', help="Use detection camera multi-view loss")
+    self.parser.add_argument('--MVOnly', action='store_true', help="Use only Multiview loss in training")
 
     # test
     self.parser.add_argument('--flip_test', action='store_true',
