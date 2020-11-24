@@ -210,6 +210,7 @@ class ReprojectionLoss(nn.Module):
           loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'mean')
           if cam == batch['cam_num'][B]:
             mv_loss['det'] += loss
+            mv_loss['tot'] += loss
           else:
             mv_loss[cam] += loss  
             mv_loss['tot'] += loss

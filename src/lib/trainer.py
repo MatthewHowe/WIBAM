@@ -129,7 +129,8 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    # losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    losses = {'mv':0, 'tot':0}
 
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
@@ -143,19 +144,19 @@ class MultiviewLoss(torch.nn.Module):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]
         mask[i] = batch['mask'][i][batch['cam_num'][i]]
 
-      regression_heads = ['reg', 'wh']
+      # regression_heads = ['reg', 'wh']
 
-      for head in regression_heads:
-        if head in output:
-          losses[head] += self.RegWeightedL1Loss(
-            output[head], batch[head + '_mask'],
-            batch['ind'], batch[head]) / opt.num_stacks
+      # for head in regression_heads:
+      #   if head in output:
+      #     losses[head] += self.RegWeightedL1Loss(
+      #       output[head], batch[head + '_mask'],
+      #       batch['ind'], batch[head]) / opt.num_stacks
 
       # Heatmap loss
-      if 'hm' in output:
-        losses['hm'] += self.FastFocalLoss(
-          output['hm'], batch['hm'], batch['ind'],
-          mask, cat) / opt.num_stacks
+      # if 'hm' in output:
+      #   losses['hm'] += self.FastFocalLoss(
+      #     output['hm'], batch['hm'], batch['ind'],
+      #     mask, cat) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
