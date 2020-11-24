@@ -6,7 +6,7 @@ import cv2
 import time
 import torch
 import numpy as np
-from progress.bar import Bar as Bar
+from progress.bar import Bar
 
 from model.data_parallel import DataParallel
 from utils.utils import AverageMeter
@@ -127,7 +127,7 @@ class MultiviewLoss(torch.nn.Module):
     """
     opt = self.opt
     # reset all losses to zero
-    if self.opt.MVOnly:
+    if self.opt.mv_only:
       losses = {'mv':0, 'tot':0}
     else:
       losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
@@ -145,7 +145,7 @@ class MultiviewLoss(torch.nn.Module):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]
         mask[i] = batch['mask'][i][batch['cam_num'][i]]
 
-      if not self.opt.MVOnly:
+      if not self.opt.mv_only:
         regression_heads = ['reg', 'wh']
 
         for head in regression_heads:
