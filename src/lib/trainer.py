@@ -230,6 +230,7 @@ class Trainer(object):
     avg_loss_stats = None
     num_iters = len(data_loader) if opt.num_iters < 0 else opt.num_iters
     bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
+    bar.width = 5
     end = time.time()
 
     # Training loop
