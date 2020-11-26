@@ -4,6 +4,7 @@ nuScenes pre-processing script.
 This file convert the nuScenes annotation into COCO format.
 '''
 import json
+import os
 import numpy as np
 import cv2
 import copy

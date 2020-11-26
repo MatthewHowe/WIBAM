@@ -207,7 +207,7 @@ class ReprojectionLoss(nn.Module):
         if len(gt_matched_boxes[B][cam]) > 0:
           gt_bboxes = torch.stack(gt_matched_boxes[B][cam])
           pr_bboxes = torch.stack(pr_matched_boxes[B][cam])
-          loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'mean')
+          loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'sum')
           if cam == batch['cam_num'][B]:
             if self.opt.no_det:
               mv_loss['det'] += loss
