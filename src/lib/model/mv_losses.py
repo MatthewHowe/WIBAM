@@ -143,8 +143,8 @@ class ReprojectionLoss(nn.Module):
     mv_loss = {}
     # for cam in range(num_cams):
     #   mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
-    mv_loss['det'] = torch.tensor(0, dtype=float).to(device='cuda')
-    mv_loss['tot'] = torch.tensor(0, dtype=float).to(device='cuda')
+    # mv_loss['det'] = torch.tensor(100, dtype=float).to(device='cuda')
+    # mv_loss['tot'] = torch.tensor(100, dtype=float).to(device='cuda')
 
     if self.opt.show_repro:
       drawing_images = batch['drawing_images'].detach().cpu().numpy()
@@ -155,7 +155,7 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 1000:
+        if cost_matrix[B, pr_index, gt_index] < 50:
           gt_box_T = batch['bboxes'][B, det_cam, gt_index]
           gt_matched_boxes[B][det_cam].append(gt_box_T)
           pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
@@ -209,17 +209,27 @@ class ReprojectionLoss(nn.Module):
           pr_bboxes = torch.stack(pr_matched_boxes[B][cam])
           loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'mean')
           if cam == batch['cam_num'][B]:
-            if self.opt.no_det:
-              mv_loss['det'] += loss
+            if 'det' not in mv_loss:
+              mv_loss['det'] = loss
             else:
               mv_loss['det'] += loss
-              mv_loss['tot'] += loss
+
+            if not self.opt.no_det:
+              if 'tot' not in mv_loss:
+                mv_loss['tot'] = loss
+              else:
+                mv_loss['tot'] += loss
+
           else:
             if cam not in mv_loss:
               mv_loss[cam] = loss
             else:
               mv_loss[cam] += loss
-            mv_loss['tot'] += loss
+            
+            if 'tot' not in mv_loss:
+              mv_loss['tot'] = loss
+            else:
+              mv_loss['tot'] += loss
   
     if self.opt.show_repro:
       for B in range(BN):
