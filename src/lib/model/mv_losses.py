@@ -142,9 +142,9 @@ class ReprojectionLoss(nn.Module):
     matches = [0]*BN
     mv_loss = {}
     for cam in range(num_cams):
-      mv_loss[cam] = 0
-    mv_loss['det'] = 0
-    mv_loss['tot'] = 0
+      mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
+    mv_loss['det'] = torch.tensor(0, dtype=float).to(device='cuda')
+    mv_loss['tot'] = torch.tensor(0, dtype=float).to(device='cuda')
 
     if self.opt.show_repro:
       drawing_images = batch['drawing_images'].detach().cpu().numpy()
