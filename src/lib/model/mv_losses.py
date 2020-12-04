@@ -155,7 +155,7 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 50:
+        if cost_matrix[B, pr_index, gt_index] < 1000:
           gt_box_T = batch['bboxes'][B, det_cam, gt_index]
           gt_matched_boxes[B][det_cam].append(gt_box_T)
           pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
