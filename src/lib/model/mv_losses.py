@@ -237,5 +237,7 @@ class ReprojectionLoss(nn.Module):
         cv2.namedWindow("Batch {}".format(B), cv2.WINDOW_NORMAL)
         cv2.imshow("Batch {}".format(B), composite)
         cv2.waitKey(0)
+  
+    print(mv_loss)
 
     return mv_loss

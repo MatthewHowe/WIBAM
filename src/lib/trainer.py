@@ -248,8 +248,6 @@ class Trainer(object):
       # Loss is the total loss for the batch
       output, loss, loss_stats = model_with_loss(batch)
 
-      print(loss_stats)
-
       # If training phase, back propogate the loss
       if phase == 'train':
         loss = loss.mean()
