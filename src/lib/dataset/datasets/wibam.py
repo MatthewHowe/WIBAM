@@ -66,7 +66,7 @@ class WIBAM(GenericDataset):
 
     # Get annotation path
     ann_path = os.path.join(data_dir,
-      'annotations', 'wibam_{}.json').format(split)
+      'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version)
 
     self.images = None
     # load image list and coco
