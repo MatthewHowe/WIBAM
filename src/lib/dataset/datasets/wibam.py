@@ -499,6 +499,3 @@ class WIBAM(GenericDataset):
           item['loc'][0], item['loc'][1], item['loc'][2]))
         f.write(' {:.2f} {:.2f}\n'.format(item['rot_y'], item['score']))
       f.close()
-
-  def run_eval(self, results, save_dir):
-    print("[ERROR] Not implemented")

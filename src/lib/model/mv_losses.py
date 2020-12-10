@@ -141,6 +141,7 @@ class ReprojectionLoss(nn.Module):
     ddd_matched_boxes = [[empty.copy()]*num_cams]*BN
     matches = [0]*BN
     mv_loss = {}
+    
     # for cam in range(num_cams):
     #   mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
     # mv_loss['det'] = torch.tensor(100, dtype=float).to(device='cuda')
