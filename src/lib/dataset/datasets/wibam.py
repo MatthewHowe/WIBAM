@@ -282,6 +282,8 @@ class WIBAM(GenericDataset):
       #     dtype=np.float32)
       ret['ctr'][obj] = ct
 
+      ret['bboxes'][cam][obj] += 50
+
       # Offset of int and float (decimal part of centre)
       ret['reg'][obj] = ct - ct_int
     
