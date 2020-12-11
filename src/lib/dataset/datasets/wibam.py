@@ -270,7 +270,7 @@ class WIBAM(GenericDataset):
     if pred_cam:
       # wh refers to width and height of bounding box
       if 'wh' in ret:
-        ret['wh'][obj] = 1. * w, 1. * h
+        ret['wh'][obj] = 1. * w + 50, 1. * h + 50
         ret['wh_mask'][obj] = 1
 
       # Index of centre location
@@ -280,7 +280,7 @@ class WIBAM(GenericDataset):
       #     [(bbox_input[0] + bbox_input[2] / 2), 
       #     (bbox_input[1] + bbox_input[3] / 2)], 
       #     dtype=np.float32)
-      ret['ctr'][obj] = ct
+      ret['ctr'][obj] = ct + 50
 
       ret['bboxes'][cam][obj] += 50
 
