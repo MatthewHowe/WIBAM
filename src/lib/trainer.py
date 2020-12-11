@@ -289,6 +289,9 @@ class Trainer(object):
               self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_train)
             elif phase == "val":
               self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_val)
+
+      for l, val in avg_loss_stats.items():
+        Bar.suffix = Bar.suffix + '|{} {:.2f} '.format(l, avg_loss_stats[l].avg)
       Bar.suffix = Bar.suffix + '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar
         if iter_id % opt.print_iter == 0:
