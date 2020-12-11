@@ -273,7 +273,9 @@ class Trainer(object):
           loss_val = torch.mean(loss_stats[l]).item()
         except:
           continue
-        if loss_val != 0 and l in avg_loss_stats:
+        if l not in avg_loss_stats:
+          avg_loss_stats[l] = AverageMeter()
+        if loss_val != 0:
           avg_loss_stats[l].update(
             loss_val, batch['image'].size(0)
           )
