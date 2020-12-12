@@ -279,7 +279,6 @@ class Trainer(object):
           avg_loss_stats[l].update(
             loss_val, batch['image'].size(0)
           )
-          Bar.suffix = Bar.suffix + '|{} {:.2f} '.format(l, avg_loss_stats[l].avg)
 
           # Tensorboard log
           if l == "amodel_offset":
