@@ -1,5 +1,6 @@
 # File to contain functions for calculating multi view losses
 import cv2
+import copy
 import random
 import torch
 from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
@@ -136,12 +137,13 @@ class ReprojectionLoss(nn.Module):
                           gt_centers, batch['mask'], batch['cam_num'])
     empty = []
 
-    gt_matched_boxes = [[empty.copy()]*num_cams]*BN 
-    pr_matched_boxes = [[empty.copy()]*num_cams]*BN 
-    ddd_matched_boxes = [[empty.copy()]*num_cams]*BN
+    gt_matched_boxes = copy.deepcopy([[]*num_cams]*BN)
+    pr_matched_boxes =copy.deepcopy([[]*num_cams]*BN) 
+    ddd_matched_boxes = copy.deepcopy([[]*num_cams]*BN)
     matches = [0]*BN
-    mv_loss = {}
     
+    gt_dict = {}
+    pr_dict = {}
     # for cam in range(num_cams):
     #   mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
     # mv_loss['det'] = torch.tensor(100, dtype=float).to(device='cuda')
@@ -156,12 +158,18 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 250:
-          gt_box_T = batch['bboxes'][B, det_cam, gt_index]
-          gt_matched_boxes[B][det_cam].append(gt_box_T)
-          pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
-          pr_matched_boxes[B][det_cam].append(pr_box_T)
+        if cost_matrix[B, pr_index, gt_index] < 250 and batch['mask'][B, det_cam, gt_index].item() is True:
+          
           obj_id = batch['obj_id'][B, det_cam, gt_index]
+
+          gt_box_T = batch['bboxes'][B, det_cam, gt_index]
+          pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
+          if 'det' not in gt_dict:
+            gt_dict['det'] = [gt_box_T]
+            pr_dict['det'] = [pr_box_T]
+          else:
+            gt_dict['det'].append(gt_box_T)
+            pr_dict['det'].append(pr_box_T)
 
           # Drawing functions
           if self.opt.show_repro:
@@ -186,11 +194,15 @@ class ReprojectionLoss(nn.Module):
                 gt_ind = obj_id_list.index(obj_id)
               except:
                 continue
-              
+
               gt_box_T = batch['bboxes'][B,cam,gt_ind]
-              gt_matched_boxes[B][cam].append(gt_box_T)
               pr_box_T = detections['2D_bounding_boxes'][B,cam,pr_index]
-              pr_matched_boxes[B][cam].append(pr_box_T)
+              if cam not in gt_dict:
+                gt_dict[cam] = [gt_box_T]
+                pr_dict[cam] = [pr_box_T]
+              else:
+                gt_dict[cam].append(gt_box_T)
+                pr_dict[cam].append(pr_box_T)
 
               # Drawing functions
               if self.opt.show_repro:
@@ -202,37 +214,25 @@ class ReprojectionLoss(nn.Module):
                 cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[pr_index], 2)
                 cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
-    # Calculate GIoU for all matches
-    for B in range(BN):
-      for cam in range(num_cams):
-        if len(gt_matched_boxes[B][cam]) > 0:
-          gt_bboxes = torch.stack(gt_matched_boxes[B][cam])
-          pr_bboxes = torch.stack(pr_matched_boxes[B][cam])
-          loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'mean')
-          if cam == batch['cam_num'][B]:
-            if 'det' not in mv_loss:
-              mv_loss['det'] = loss
-            else:
-              mv_loss['det'] += loss
+    mv_loss = {'tot': 0}
+    for key, val in gt_dict.items():
+      gt_boxes = torch.stack(val, 0)
+      pr_boxes = torch.stack(pr_dict[key], 0)
+      loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean')
 
-            if not self.opt.no_det:
-              if 'tot' not in mv_loss:
-                mv_loss['tot'] = loss
-              else:
-                mv_loss['tot'] += loss
+      mv_loss[key] = loss
 
-          else:
-            if cam not in mv_loss:
-              mv_loss[cam] = loss
-            else:
-              mv_loss[cam] += loss
+    for key, loss in mv_loss.items():      
+      if key == 'det' and self.opt.no_det:
+        continue
+      elif key == 'det' and self.opt.det_only:
+        mv_loss['tot'] += loss
+        break
+      elif not self.opt.det_only:
+        mv_loss['tot'] += loss
 
-            if not self.opt.det_only:            
-              if 'tot' not in mv_loss:
-                mv_loss['tot'] = loss
-              else:
-                mv_loss['tot'] += loss
-  
+    mv_loss['tot'] = mv_loss['tot'] / (num_cams * BN)
+
     if self.opt.show_repro:
       for B in range(BN):
         composite = return_four_frames(drawing_images[B])

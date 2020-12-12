@@ -67,7 +67,7 @@ class WIBAM(GenericDataset):
     # Get annotation path
     if opt.dataset_version == '':
       ann_path = os.path.join(data_dir,
-        'annotations', 'wibam_{}.json').format(split)
+        'annotations', 'wibam_{}.json').format(split, opt.dataset_version)
     else:
       ann_path = os.path.join(data_dir,
         'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version)
@@ -270,7 +270,7 @@ class WIBAM(GenericDataset):
     if pred_cam:
       # wh refers to width and height of bounding box
       if 'wh' in ret:
-        ret['wh'][obj] = 1. * w + 50, 1. * h + 50
+        ret['wh'][obj] = 1. * w, 1. * h
         ret['wh_mask'][obj] = 1
 
       # Index of centre location
@@ -280,9 +280,7 @@ class WIBAM(GenericDataset):
       #     [(bbox_input[0] + bbox_input[2] / 2), 
       #     (bbox_input[1] + bbox_input[3] / 2)], 
       #     dtype=np.float32)
-      ret['ctr'][obj] = ct + 50
-
-      ret['bboxes'][cam][obj] += 50
+      ret['ctr'][obj] = ct
 
       # Offset of int and float (decimal part of centre)
       ret['reg'][obj] = ct - ct_int
