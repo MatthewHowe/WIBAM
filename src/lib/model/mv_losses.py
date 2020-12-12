@@ -231,7 +231,7 @@ class ReprojectionLoss(nn.Module):
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
 
-    mv_loss['tot'] = mv_loss['tot'] / (len(gt_dict) + 1e-6
+    mv_loss['tot'] = mv_loss['tot'] / (len(gt_dict) + 1e-6)
 
     if self.opt.show_repro:
       for B in range(BN):
