@@ -43,6 +43,7 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   """
   # TODO: Better variable names
   # TODO: Improve comments
+  size = [1920,1080]
 
   # Convert bbox format
   gt_bboxes[:,2] = gt_bboxes[:,0] + gt_bboxes[:,2]
@@ -50,7 +51,12 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
 
   pr_bboxes[:,2] = pr_bboxes[:,0] + pr_bboxes[:,2]
   pr_bboxes[:,3] = pr_bboxes[:,1] + pr_bboxes[:,3]
+  # C
+  pr_bboxes[:,0] = torch.clamp(pr_bboxes[:,0], 0, size[0])
+  pr_bboxes[:,2] = torch.clamp(pr_bboxes[:,2], 0, size[0])
 
+  pr_bboxes[:,1] = torch.clamp(pr_bboxes[:,1], 0, size[1])
+  pr_bboxes[:,3] = torch.clamp(pr_bboxes[:,3], 0, size[1])
 
   gt_area = (gt_bboxes[:, 2]-gt_bboxes[:, 0])*(gt_bboxes[:, 3]-gt_bboxes[:, 1])
   pr_area = (pr_bboxes[:, 2]-pr_bboxes[:, 0])*(pr_bboxes[:, 3]-pr_bboxes[:, 1])
