@@ -228,10 +228,10 @@ class ReprojectionLoss(nn.Module):
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
 
-    # # Make sure that number of detections is equal to number of gt detections
-    # mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
-    # mv_loss['tot_GIoU'] = mv_loss['tot']
-    # mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    # Make sure that number of detections is equal to number of gt detections
+    mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
+    mv_loss['tot_GIoU'] = mv_loss['tot']
+    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
     
 
     if self.opt.show_repro:
