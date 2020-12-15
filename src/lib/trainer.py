@@ -255,6 +255,7 @@ class Trainer(object):
       if phase == 'train':
         loss = loss.mean()
         self.optimizer.zero_grad()
+        torch.autograd.set_detect_anomaly(True)
         loss.backward()
         self.optimizer.step()
       batch_time.update(time.time() - end)

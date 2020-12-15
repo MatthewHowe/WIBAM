@@ -154,11 +154,13 @@ class Debugger(object):
       c = (255 - np.array(c)).tolist()
     if self.opt.tango_color:
       c = (255 - tango_color_dark[cat][0][0]).tolist()
+    txt = ""
     if conf >= 1:
       ID = int(conf) if not self.opt.not_show_number else ''
       txt = '{}{}'.format(self.names[cat], ID)
     else:
-      txt = '{}{:.1f}'.format(self.names[cat], conf)
+      if cat in self.names:
+        txt = '{}{:.1f}'.format(self.names[cat-2], conf)
     thickness = 2
     fontsize = 0.8 if self.opt.qualitative else 0.5
     if not self.opt.not_show_bbox:

@@ -164,7 +164,7 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 250 and batch['mask'][B, det_cam, gt_index].item() is True:
+        if cost_matrix[B, pr_index, gt_index] < 50 and batch['mask'][B, det_cam, gt_index].item() is True:
           
           obj_id = batch['obj_id'][B, det_cam, gt_index]
 
@@ -237,7 +237,11 @@ class ReprojectionLoss(nn.Module):
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
 
-    mv_loss['tot'] = mv_loss['tot'] / (len(gt_dict) + 1e-6)
+    # Make sure that number of detections is equal to number of gt detections
+    mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
+    mv_loss['tot_GIoU'] = mv_loss['tot']
+    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    
 
     if self.opt.show_repro:
       for B in range(BN):

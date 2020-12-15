@@ -194,6 +194,8 @@ class WIBAM(GenericDataset):
           self._add_instance(
             ret, gt_det, cam, obj, cls_id, bbox, ann['bbox'], ann, pred_cam)
 
+      ret['mask_det'] = ret['mask'][cam_num]
+
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)
         meta = {'c': c, 's': s, 'gt_det': gt_det, 'img_id': img_info['id'],
