@@ -418,40 +418,59 @@ def decode_output(output, K=100, opt=None):
 
   return ret
 
+def translate_centre_points(points, 
+                            img_ctr, 
+                            scale, 
+                            out_size, 
+                            BN, 
+                            max_objects, 
+                            rot=0):
+
+  trans = torch.Tensor(get_affine_transform(
+                img_ctr, scale, rot, out_size,
+                inv=1).astype(np.float32)).to('cuda')
+
+  points = torch.cat((points.reshape(BN, max_objects, 2),
+                         torch.ones(BN, max_objects,1).to('cuda')),
+                         2)
+
+  return torch.matmul(points, trans.T)
+
 def get_affine_transform(center,
                          scale,
                          rot,
                          output_size,
                          shift=np.array([0, 0], dtype=np.float32),
                          inv=0):
-    if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
-        scale = np.array([scale, scale], dtype=np.float32)
 
-    scale_tmp = scale
-    src_w = scale_tmp[0]
-    dst_w = output_size[0]
-    dst_h = output_size[1]
+  if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
+    scale = np.array([scale, scale], dtype=np.float32)
 
-    rot_rad = np.pi * rot / 180
-    src_dir = get_dir([0, src_w * -0.5], rot_rad)
-    dst_dir = np.array([0, dst_w * -0.5], np.float32)
+  scale_tmp = scale
+  src_w = scale_tmp[0]
+  dst_w = output_size[0]
+  dst_h = output_size[1]
 
-    src = np.zeros((3, 2), dtype=np.float32)
-    dst = np.zeros((3, 2), dtype=np.float32)
-    src[0, :] = center + scale_tmp * shift
-    src[1, :] = center + src_dir + scale_tmp * shift
-    dst[0, :] = [dst_w * 0.5, dst_h * 0.5]
-    dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float32) + dst_dir
+  rot_rad = np.pi * rot / 180
+  src_dir = get_dir([0, src_w * -0.5], rot_rad)
+  dst_dir = np.array([0, dst_w * -0.5], np.float32)
 
-    src[2:, :] = get_3rd_point(src[0, :], src[1, :])
-    dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
+  src = np.zeros((3, 2), dtype=np.float32)
+  dst = np.zeros((3, 2), dtype=np.float32)
+  src[0, :] = center + scale_tmp * shift
+  src[1, :] = center + src_dir + scale_tmp * shift
+  dst[0, :] = [dst_w * 0.5, dst_h * 0.5]
+  dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float32) + dst_dir
 
-    if inv:
-        trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
-    else:
-        trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
+  src[2:, :] = get_3rd_point(src[0, :], src[1, :])
+  dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
 
-    return trans
+  if inv:
+    trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
+  else:
+    trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
+
+  return trans
 
 def transform_preds_with_trans(coords, trans):
     # target_coords = np.concatenate(

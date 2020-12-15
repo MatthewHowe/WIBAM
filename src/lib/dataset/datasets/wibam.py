@@ -65,8 +65,12 @@ class WIBAM(GenericDataset):
         self.instances.append(int(line))
 
     # Get annotation path
-    ann_path = os.path.join(data_dir,
-      'annotations', 'wibam_{}.json').format(split)
+    if opt.dataset_version == '':
+      ann_path = os.path.join(data_dir,
+        'annotations', 'wibam_{}.json').format(split, opt.dataset_version)
+    else:
+      ann_path = os.path.join(data_dir,
+        'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version)
 
     self.images = None
     # load image list and coco
@@ -189,6 +193,8 @@ class WIBAM(GenericDataset):
           # GT_det dict is used for debugging
           self._add_instance(
             ret, gt_det, cam, obj, cls_id, bbox, ann['bbox'], ann, pred_cam)
+
+      ret['mask_det'] = ret['mask'][cam_num]
 
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)

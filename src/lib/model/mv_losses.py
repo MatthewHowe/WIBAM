@@ -1,5 +1,6 @@
 # File to contain functions for calculating multi view losses
 import cv2
+import copy
 import random
 import torch
 from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
@@ -42,6 +43,7 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   """
   # TODO: Better variable names
   # TODO: Improve comments
+  size = [1920,1080]
 
   # Convert bbox format
   gt_bboxes[:,2] = gt_bboxes[:,0] + gt_bboxes[:,2]
@@ -49,7 +51,14 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
 
   pr_bboxes[:,2] = pr_bboxes[:,0] + pr_bboxes[:,2]
   pr_bboxes[:,3] = pr_bboxes[:,1] + pr_bboxes[:,3]
+  # C
+  x1 = torch.clamp(pr_bboxes[:,0], 0, size[0])
+  x2 = torch.clamp(pr_bboxes[:,2], 0, size[0])
 
+  y1 = torch.clamp(pr_bboxes[:,1], 0, size[1])
+  y2 = torch.clamp(pr_bboxes[:,3], 0, size[1])
+
+  pr_bboxes = torch.stack((x1,y1,x2,y2),1)
 
   gt_area = (gt_bboxes[:, 2]-gt_bboxes[:, 0])*(gt_bboxes[:, 3]-gt_bboxes[:, 1])
   pr_area = (pr_bboxes[:, 2]-pr_bboxes[:, 0])*(pr_bboxes[:, 3]-pr_bboxes[:, 1])
@@ -105,22 +114,22 @@ class ReprojectionLoss(nn.Module):
 
     decoded_output = decode_output(output, self.opt.K)
     # Post processing code
-    trans = torch.Tensor(get_affine_transform(
-                np.array([960,540]), 1920, 0, (200, 112),
-                inv=1).astype(np.float32)).to('cuda')
 
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
-    centers = centers + decoded_output['amodel_offset']
-    centers = torch.cat((centers.reshape(BN, max_objects, 2),
-                         torch.ones(BN, max_objects,1).to('cuda')),
-                         2)
-    centers = torch.matmul(centers, trans.T)
+    centers_offset = centers + decoded_output['amodel_offset']
+
+    centers = translate_centre_points(centers, np.array([960,540]), 1920, 
+                                      (200,112), BN, max_objects)
+
+    centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
+                                             1920, (200,112), BN, max_objects)
+    
     # Put detections into their own dictionary with required information
     # Scale depth with focal length
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
-    detections['center'] = centers
+    detections['center'] = centers_offset
 
     det_cam_to_det_3D_ccf(detections,batch)
 
@@ -128,24 +137,18 @@ class ReprojectionLoss(nn.Module):
 
     dets_3D_wcf_to_dets_2D(detections, batch)
 
-    gt_centers = batch['ctr'].type(torch.float)
-    temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
-    gt_centers = torch.matmul(temp_gt, trans.T)
+    # gt_centers = batch['ctr'].type(torch.float)
+    # temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
+    # gt_centers = torch.matmul(temp_gt, trans.T)
 
-    cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
+    gt_centers = translate_centre_points(batch['ctr'].type(torch.float), np.array([960,540]),
+                                         1920, (200,112), BN, max_objects)
+
+    cost_matrix, gt_indexes = match_predictions_ground_truth(centers, 
                           gt_centers, batch['mask'], batch['cam_num'])
-    empty = []
-
-    gt_matched_boxes = [[empty.copy()]*num_cams]*BN 
-    pr_matched_boxes = [[empty.copy()]*num_cams]*BN 
-    ddd_matched_boxes = [[empty.copy()]*num_cams]*BN
-    matches = [0]*BN
-    mv_loss = {}
     
-    # for cam in range(num_cams):
-    #   mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
-    # mv_loss['det'] = torch.tensor(100, dtype=float).to(device='cuda')
-    # mv_loss['tot'] = torch.tensor(100, dtype=float).to(device='cuda')
+    gt_dict = {}
+    pr_dict = {}
 
     if self.opt.show_repro:
       drawing_images = batch['drawing_images'].detach().cpu().numpy()
@@ -156,12 +159,18 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 50:
-          gt_box_T = batch['bboxes'][B, det_cam, gt_index]
-          gt_matched_boxes[B][det_cam].append(gt_box_T)
-          pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
-          pr_matched_boxes[B][det_cam].append(pr_box_T)
+        if cost_matrix[B, pr_index, gt_index] < 50 and batch['mask'][B, det_cam, gt_index].item() is True:
+          
           obj_id = batch['obj_id'][B, det_cam, gt_index]
+
+          gt_box_T = batch['bboxes'][B, det_cam, gt_index]
+          pr_box_T = detections['2D_bounding_boxes'][B,det_cam,pr_index]
+          if 'det' not in gt_dict:
+            gt_dict['det'] = [gt_box_T]
+            pr_dict['det'] = [pr_box_T]
+          else:
+            gt_dict['det'].append(gt_box_T)
+            pr_dict['det'].append(pr_box_T)
 
           # Drawing functions
           if self.opt.show_repro:
@@ -175,7 +184,6 @@ class ReprojectionLoss(nn.Module):
             cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
           if obj_id != -1:
-            matches[B] += 1
             
             for cam in range(num_cams):
               if cam == det_cam:
@@ -186,11 +194,15 @@ class ReprojectionLoss(nn.Module):
                 gt_ind = obj_id_list.index(obj_id)
               except:
                 continue
-              
+
               gt_box_T = batch['bboxes'][B,cam,gt_ind]
-              gt_matched_boxes[B][cam].append(gt_box_T)
               pr_box_T = detections['2D_bounding_boxes'][B,cam,pr_index]
-              pr_matched_boxes[B][cam].append(pr_box_T)
+              if cam not in gt_dict:
+                gt_dict[cam] = [gt_box_T]
+                pr_dict[cam] = [pr_box_T]
+              else:
+                gt_dict[cam].append(gt_box_T)
+                pr_dict[cam].append(pr_box_T)
 
               # Drawing functions
               if self.opt.show_repro:
@@ -202,36 +214,26 @@ class ReprojectionLoss(nn.Module):
                 cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[pr_index], 2)
                 cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
-    # Calculate GIoU for all matches
-    for B in range(BN):
-      for cam in range(num_cams):
-        if len(gt_matched_boxes[B][cam]) > 0:
-          gt_bboxes = torch.stack(gt_matched_boxes[B][cam])
-          pr_bboxes = torch.stack(pr_matched_boxes[B][cam])
-          loss = generalized_iou_loss(gt_bboxes,pr_bboxes, 'mean')
-          if cam == batch['cam_num'][B]:
-            if 'det' not in mv_loss:
-              mv_loss['det'] = loss
-            else:
-              mv_loss['det'] += loss
+    mv_loss = {'tot': 0}
+    for key, val in gt_dict.items():
+      gt_boxes = torch.stack(val, 0)
+      pr_boxes = torch.stack(pr_dict[key], 0)
+      loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean')
+      mv_loss[key] = loss
+      if key == 'det' and self.opt.no_det:
+        continue
+      elif key == 'det' and self.opt.det_only:
+        mv_loss['tot'] += loss
+        break
+      elif not self.opt.det_only:
+        mv_loss['tot'] += loss
 
-            if not self.opt.no_det:
-              if 'tot' not in mv_loss:
-                mv_loss['tot'] = loss
-              else:
-                mv_loss['tot'] += loss
+    # # Make sure that number of detections is equal to number of gt detections
+    # mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
+    # mv_loss['tot_GIoU'] = mv_loss['tot']
+    # mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    
 
-          else:
-            if cam not in mv_loss:
-              mv_loss[cam] = loss
-            else:
-              mv_loss[cam] += loss
-            
-            if 'tot' not in mv_loss:
-              mv_loss['tot'] = loss
-            else:
-              mv_loss['tot'] += loss
-  
     if self.opt.show_repro:
       for B in range(BN):
         composite = return_four_frames(drawing_images[B])

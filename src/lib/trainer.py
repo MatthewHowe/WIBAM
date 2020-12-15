@@ -215,6 +215,7 @@ class Trainer(object):
           state[k] = v.to(device=device, non_blocking=True)
 
   def run_epoch(self, phase, epoch, data_loader):
+    torch.autograd.set_detect_anomaly(True)
     model_with_loss = self.model_with_loss
     if phase == 'train':
 
@@ -255,6 +256,7 @@ class Trainer(object):
       if phase == 'train':
         loss = loss.mean()
         self.optimizer.zero_grad()
+        
         loss.backward()
         self.optimizer.step()
       batch_time.update(time.time() - end)
