@@ -114,22 +114,22 @@ class ReprojectionLoss(nn.Module):
 
     decoded_output = decode_output(output, self.opt.K)
     # Post processing code
-    trans = torch.Tensor(get_affine_transform(
-                np.array([960,540]), 1920, 0, (200, 112),
-                inv=1).astype(np.float32)).to('cuda')
 
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
-    centers = centers + decoded_output['amodel_offset']
-    centers = torch.cat((centers.reshape(BN, max_objects, 2),
-                         torch.ones(BN, max_objects,1).to('cuda')),
-                         2)
-    centers = torch.matmul(centers, trans.T)
+    centers_offset = centers + decoded_output['amodel_offset']
+
+    centers = translate_centre_points(centers, np.array([960,540]), 1920, 
+                                      (200,112), BN, max_objects)
+
+    centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
+                                             1920, (200,112), BN, max_objects)
+    
     # Put detections into their own dictionary with required information
     # Scale depth with focal length
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
-    detections['center'] = centers
+    detections['center'] = centers_offset
 
     det_cam_to_det_3D_ccf(detections,batch)
 
@@ -137,11 +137,14 @@ class ReprojectionLoss(nn.Module):
 
     dets_3D_wcf_to_dets_2D(detections, batch)
 
-    gt_centers = batch['ctr'].type(torch.float)
-    temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
-    gt_centers = torch.matmul(temp_gt, trans.T)
+    # gt_centers = batch['ctr'].type(torch.float)
+    # temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
+    # gt_centers = torch.matmul(temp_gt, trans.T)
 
-    cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
+    gt_centers = translate_centre_points(batch['ctr'].type(torch.float), np.array([960,540]),
+                                         1920, (200,112), BN, max_objects)
+
+    cost_matrix, gt_indexes = match_predictions_ground_truth(centers, 
                           gt_centers, batch['mask'], batch['cam_num'])
     
     gt_dict = {}
