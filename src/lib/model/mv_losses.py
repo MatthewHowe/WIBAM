@@ -227,8 +227,6 @@ class ReprojectionLoss(nn.Module):
       loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean')
 
       mv_loss[key] = loss
-
-    for key, loss in mv_loss.items():      
       if key == 'det' and self.opt.no_det:
         continue
       elif key == 'det' and self.opt.det_only:
@@ -237,10 +235,13 @@ class ReprojectionLoss(nn.Module):
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
 
-    # Make sure that number of detections is equal to number of gt detections
-    mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
-    mv_loss['tot_GIoU'] = mv_loss['tot']
-    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    # for key, loss in mv_loss.items():      
+      
+
+    # # Make sure that number of detections is equal to number of gt detections
+    # mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
+    # mv_loss['tot_GIoU'] = mv_loss['tot']
+    # mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
     
 
     if self.opt.show_repro:
