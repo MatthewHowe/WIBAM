@@ -52,11 +52,13 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   pr_bboxes[:,2] = pr_bboxes[:,0] + pr_bboxes[:,2]
   pr_bboxes[:,3] = pr_bboxes[:,1] + pr_bboxes[:,3]
   # C
-  pr_bboxes[:,0] = torch.clamp(pr_bboxes[:,0], 0, size[0])
-  pr_bboxes[:,2] = torch.clamp(pr_bboxes[:,2], 0, size[0])
+  x1 = torch.clamp(pr_bboxes[:,0], 0, size[0])
+  x2 = torch.clamp(pr_bboxes[:,2], 0, size[0])
 
-  pr_bboxes[:,1] = torch.clamp(pr_bboxes[:,1], 0, size[1])
-  pr_bboxes[:,3] = torch.clamp(pr_bboxes[:,3], 0, size[1])
+  y1 = torch.clamp(pr_bboxes[:,1], 0, size[1])
+  y2 = torch.clamp(pr_bboxes[:,3], 0, size[1])
+
+  pr_bboxes = torch.stack((x1,y1,x2,y2),1)
 
   gt_area = (gt_bboxes[:, 2]-gt_bboxes[:, 0])*(gt_bboxes[:, 3]-gt_bboxes[:, 1])
   pr_area = (pr_bboxes[:, 2]-pr_bboxes[:, 0])*(pr_bboxes[:, 3]-pr_bboxes[:, 1])
@@ -141,19 +143,9 @@ class ReprojectionLoss(nn.Module):
 
     cost_matrix, gt_indexes = match_predictions_ground_truth(detections['center'], 
                           gt_centers, batch['mask'], batch['cam_num'])
-    empty = []
-
-    gt_matched_boxes = copy.deepcopy([[]*num_cams]*BN)
-    pr_matched_boxes =copy.deepcopy([[]*num_cams]*BN) 
-    ddd_matched_boxes = copy.deepcopy([[]*num_cams]*BN)
-    matches = [0]*BN
     
     gt_dict = {}
     pr_dict = {}
-    # for cam in range(num_cams):
-    #   mv_loss[cam] = torch.tensor(0, dtype=float).to(device='cuda')
-    # mv_loss['det'] = torch.tensor(100, dtype=float).to(device='cuda')
-    # mv_loss['tot'] = torch.tensor(100, dtype=float).to(device='cuda')
 
     if self.opt.show_repro:
       drawing_images = batch['drawing_images'].detach().cpu().numpy()
@@ -189,7 +181,6 @@ class ReprojectionLoss(nn.Module):
             cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
           if obj_id != -1:
-            matches[B] += 1
             
             for cam in range(num_cams):
               if cam == det_cam:
@@ -225,7 +216,6 @@ class ReprojectionLoss(nn.Module):
       gt_boxes = torch.stack(val, 0)
       pr_boxes = torch.stack(pr_dict[key], 0)
       loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean')
-
       mv_loss[key] = loss
       if key == 'det' and self.opt.no_det:
         continue
@@ -234,9 +224,6 @@ class ReprojectionLoss(nn.Module):
         break
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
-
-    # for key, loss in mv_loss.items():      
-      
 
     # # Make sure that number of detections is equal to number of gt detections
     # mv_loss['mult'] = multiplier = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1
