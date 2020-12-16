@@ -198,7 +198,7 @@ class Trainer(object):
     self.loss_stats, self.loss = self._get_losses(opt)
     self.model_with_loss = ModleWithLoss(model, self.loss)
     self.writer = writer
-    self.total_write = total_writer
+    self.total_writer = total_writer
     self.total_steps_train = 0
     self.total_steps_val = 0
 
