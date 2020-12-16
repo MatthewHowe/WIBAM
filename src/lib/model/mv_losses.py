@@ -118,28 +118,21 @@ class ReprojectionLoss(nn.Module):
     num_cams = batch['P'].shape[1]
 
     decoded_output = decode_output(output, self.opt.K)
-    self.profiler.interval_trigger("decode_output")
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
     centers_offset = centers + decoded_output['amodel_offset']
-
-    self.profiler.interval_trigger("pre-processing")
 
     centers = translate_centre_points(centers, np.array([960,540]), 1920, 
                                       (200,112), BN, max_objects)
 
-    self.profiler.interval_trigger("translate_1")
-
     centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
                                              1920, (200,112), BN, max_objects)
-
-    self.profiler.interval_trigger("translate_2")
 
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
     detections['center'] = centers_offset
 
-    self.profiler.interval_trigger("")
+    self.profiler.interval_trigger("Pre-processing")
 
     det_cam_to_det_3D_ccf(detections,batch)
     self.profiler.interval_trigger("det_cam_to_det_3D_ccf")

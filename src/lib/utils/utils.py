@@ -52,7 +52,7 @@ class Profiler:
             if name is not "total_time":
                 sum += time.avg
 
-        string = "total_time: {:.2f}s\n".format(self.interval_times["total_time"].avg)
+        string = "\nTotal time: {:.2f}s\n".format(self.interval_times["total_time"].avg)
         for name, time in self.interval_times.items():
             if name is "total_time":
                 continue
