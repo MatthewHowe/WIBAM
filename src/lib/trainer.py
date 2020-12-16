@@ -272,11 +272,10 @@ class Trainer(object):
 
       # Logging step
       for l in loss_stats:
-        # try:
-        #   loss_val = torch.mean(loss_stats[l]).item()
-        # except:
-        #   continue
-        loss_val = torch.mean(loss_stats[l]).item()
+        try:
+          loss_val = torch.mean(loss_stats[l]).item()
+        except:
+          continue
         if l not in avg_loss_stats:
           avg_loss_stats[l] = AverageMeter()
         if loss_val != 0:
