@@ -52,6 +52,7 @@ def main(opt):
   # Initialise loggers
   logger = Logger(opt)
   writer = SummaryWriter(tensorboard_dir)
+  total_writer = SummaryWriter(tensorboard_dir)
 
   # Create model
   print('Creating model...')
@@ -68,7 +69,7 @@ def main(opt):
 
   
   # Initialise trainer class
-  trainer = Trainer(opt, model, writer, optimizer)
+  trainer = Trainer(opt, model, writer, total_writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
 
   # If validation during traininer or running test initialise

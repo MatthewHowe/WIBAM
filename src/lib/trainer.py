@@ -192,12 +192,13 @@ class ModleWithLoss(torch.nn.Module):
 
 class Trainer(object):
   def __init__(
-    self, opt, model, writer, optimizer=None):
+    self, opt, model, writer, total_writer, optimizer=None):
     self.opt = opt
     self.optimizer = optimizer
     self.loss_stats, self.loss = self._get_losses(opt)
     self.model_with_loss = ModleWithLoss(model, self.loss)
     self.writer = writer
+    self.total_write = total_writer
     self.total_steps_train = 0
     self.total_steps_val = 0
 
@@ -314,6 +315,8 @@ class Trainer(object):
 
     #
     bar.finish()
+    for loss, value in avg_loss_stats.items():
+      self.total_writer.add_scalar("{}_{}".format(phase, loss), value.avg, epoch)
     ret = {k: v.avg for k, v in avg_loss_stats.items()}
     ret['time'] = bar.elapsed_td.total_seconds() / 60.
     return ret, results

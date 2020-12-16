@@ -8,6 +8,8 @@ from utils.post_process import generic_post_process
 import torch.nn as nn
 from utils.mv_utils import *
 from .decode import generic_decode
+from utils.utils import Profiler
+
 def generate_colors(n): 
   rgb_values = [] 
   rgb_01 = []
@@ -102,10 +104,13 @@ class ReprojectionLoss(nn.Module):
     losses (list): The component losses for each reprojected view
   """  
   def __init__(self, opt=None):
+    self.profiler = Profiler()
     super(ReprojectionLoss, self).__init__()
     self.opt = opt
 
   def forward(self, output, batch):
+
+    self.profiler.start()
     detections = {}
     calibrations = {}
     BN = len(batch['cam_num'])
@@ -113,33 +118,47 @@ class ReprojectionLoss(nn.Module):
     num_cams = batch['P'].shape[1]
 
     decoded_output = decode_output(output, self.opt.K)
-
+    self.profiler.interval_trigger("decode_output")
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
     centers_offset = centers + decoded_output['amodel_offset']
+
+    self.profiler.interval_trigger("pre-processing")
 
     centers = translate_centre_points(centers, np.array([960,540]), 1920, 
                                       (200,112), BN, max_objects)
 
+    self.profiler.interval_trigger("translate_1")
+
     centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
                                              1920, (200,112), BN, max_objects)
+
+    self.profiler.interval_trigger("translate_2")
 
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
     detections['center'] = centers_offset
 
+    self.profiler.interval_trigger("")
+
     det_cam_to_det_3D_ccf(detections,batch)
+    self.profiler.interval_trigger("det_cam_to_det_3D_ccf")
 
     dets_3D_ccf_to_dets_3D_wcf(detections, batch)
+    self.profiler.interval_trigger("dets_3D_ccf_to_dets_3D_wcf")
 
     dets_3D_wcf_to_dets_2D(detections, batch)
+    self.profiler.interval_trigger("dets_3D_wcf_to_dets_2D")
 
     gt_centers = translate_centre_points(batch['ctr'].type(torch.float), np.array([960,540]),
                                          1920, (200,112), BN, max_objects)
 
+    self.profiler.interval_trigger("translate_3")
+
     cost_matrix, gt_indexes = match_predictions_ground_truth(centers, 
                           gt_centers, batch['mask'], batch['cam_num'])
-    
+    self.profiler.interval_trigger("matching")  
+
     gt_dict = {}
     pr_dict = {}
 
@@ -207,6 +226,8 @@ class ReprojectionLoss(nn.Module):
                 cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[pr_index], 2)
                 cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
+    self.profiler.interval_trigger("Constructing boxes")  
+
     mv_loss = {'tot': 0}
     for key, val in gt_dict.items():
       gt_boxes = torch.stack(val, 0)
@@ -221,11 +242,15 @@ class ReprojectionLoss(nn.Module):
       elif not self.opt.det_only:
         mv_loss['tot'] += loss
 
+    self.profiler.interval_trigger("Calculating loss")  
+
     # Make sure that number of detections is equal to number of gt detections
     mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
     mv_loss['tot_GIoU'] = mv_loss['tot']
     mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
     
+    self.profiler.interval_trigger("Multipling loss")
+
     if self.opt.show_repro:
       for B in range(BN):
         composite = return_four_frames(drawing_images[B])
@@ -233,4 +258,17 @@ class ReprojectionLoss(nn.Module):
         cv2.imshow("Batch {}".format(B), composite)
         cv2.waitKey(0)
 
+    self.profiler.pause()
+    self.profiler.print_interval_times()
     return mv_loss
+
+
+# total_time: 1.15s (32.90%)
+# pre-processing: 1.21s (34.77%)
+# det_cam_to_det_3D_ccf: 0.01s (0.27%)
+# dets_3D_ccf_to_dets_3D_wcf: 0.59s (16.91%)
+# dets_3D_wcf_to_dets_2D: 0.37s (10.68%)
+# matching: 0.00s (0.06%)
+# Constructing boxes: 0.07s (1.97%)
+# Calculating loss: 0.08s (2.43%)
+# Multipling loss: 0.00s (0.01%)
