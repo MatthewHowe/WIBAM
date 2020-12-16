@@ -113,7 +113,6 @@ class ReprojectionLoss(nn.Module):
     num_cams = batch['P'].shape[1]
 
     decoded_output = decode_output(output, self.opt.K)
-    # Post processing code
 
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
     centers_offset = centers + decoded_output['amodel_offset']
@@ -153,9 +152,7 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 50 and 
-           batch['mask'][B, det_cam, gt_index].item() is True and
-           decoded_output['scores'][B, pr]:
+        if cost_matrix[B, pr_index, gt_index] < 50 and batch['mask'][B, det_cam, gt_index].item() is True:
           
           obj_id = batch['obj_id'][B, det_cam, gt_index]
 
@@ -229,7 +226,6 @@ class ReprojectionLoss(nn.Module):
     mv_loss['tot_GIoU'] = mv_loss['tot']
     mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
     
-
     if self.opt.show_repro:
       for B in range(BN):
         composite = return_four_frames(drawing_images[B])
