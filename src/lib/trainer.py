@@ -216,7 +216,7 @@ class Trainer(object):
           state[k] = v.to(device=device, non_blocking=True)
 
   def run_epoch(self, phase, epoch, data_loader):
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     model_with_loss = self.model_with_loss
     if phase == 'train':
 
