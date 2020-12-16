@@ -252,16 +252,5 @@ class ReprojectionLoss(nn.Module):
         cv2.waitKey(0)
 
     self.profiler.pause()
-    self.profiler.print_interval_times()
+    # self.profiler.print_interval_times()
     return mv_loss
-
-
-# total_time: 1.15s (32.90%)
-# pre-processing: 1.21s (34.77%)
-# det_cam_to_det_3D_ccf: 0.01s (0.27%)
-# dets_3D_ccf_to_dets_3D_wcf: 0.59s (16.91%)
-# dets_3D_wcf_to_dets_2D: 0.37s (10.68%)
-# matching: 0.00s (0.06%)
-# Constructing boxes: 0.07s (1.97%)
-# Calculating loss: 0.08s (2.43%)
-# Multipling loss: 0.00s (0.01%)
