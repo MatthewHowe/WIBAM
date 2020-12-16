@@ -56,7 +56,7 @@ class Profiler:
         for name, time in self.interval_times.items():
             if name is "total_time":
                 continue
-            string += "{}: {:.2f}s ({:.2f}%)\n".format(name, time.avg, 100 * time.avg / sum)
+            string += "{}: {:.6f}s ({:.2f}%)\n".format(name, time.avg, 100 * time.avg / sum)
 
         print(string)
 
