@@ -123,9 +123,7 @@ class ReprojectionLoss(nn.Module):
 
     centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
                                              1920, (200,112), BN, max_objects)
-    
-    # Put detections into their own dictionary with required information
-    # Scale depth with focal length
+
     detections['depth'] = decoded_output['dep'] * 1046/1266
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
@@ -136,10 +134,6 @@ class ReprojectionLoss(nn.Module):
     dets_3D_ccf_to_dets_3D_wcf(detections, batch)
 
     dets_3D_wcf_to_dets_2D(detections, batch)
-
-    # gt_centers = batch['ctr'].type(torch.float)
-    # temp_gt = torch.cat((gt_centers,torch.ones(BN, max_objects,1).to('cuda')), 2)
-    # gt_centers = torch.matmul(temp_gt, trans.T)
 
     gt_centers = translate_centre_points(batch['ctr'].type(torch.float), np.array([960,540]),
                                          1920, (200,112), BN, max_objects)
@@ -159,7 +153,9 @@ class ReprojectionLoss(nn.Module):
       for pr_index in range(max_objects):
         gt_index = gt_indexes[B, pr_index]
 
-        if cost_matrix[B, pr_index, gt_index] < 50 and batch['mask'][B, det_cam, gt_index].item() is True:
+        if cost_matrix[B, pr_index, gt_index] < 50 and 
+           batch['mask'][B, det_cam, gt_index].item() is True and
+           decoded_output['scores'][B, pr]:
           
           obj_id = batch['obj_id'][B, det_cam, gt_index]
 
