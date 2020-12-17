@@ -106,7 +106,7 @@ def main(opt):
   )
 
   print('Starting training...')
-  for epoch in range(start_epoch, opt.num_epochs + 1):
+  for epoch in range(start_epoch + 1, opt.num_epochs + 1):
     
     mark = epoch if opt.save_all else 'last'
     
