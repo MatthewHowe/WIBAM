@@ -138,8 +138,8 @@ class MultiviewLoss(torch.nn.Module):
       output = outputs[s]
       output = self._sigmoid_output(output)
 
-      cat = torch.zeros((len(batch['cam_num']),50),dtype=int).to(device=opt.device, non_blocking=True)
-      mask = torch.zeros((len(batch['cam_num']),50),dtype=int).to(device=opt.device, non_blocking=True)
+      cat = torch.zeros((len(batch['cam_num']),opt.K),dtype=int).to(device=opt.device, non_blocking=True)
+      mask = torch.zeros((len(batch['cam_num']),opt.K),dtype=int).to(device=opt.device, non_blocking=True)
 
       for i in range(len(batch['cam_num'])):
         cat[i] = batch['cat'][i][batch['cam_num'][i]]

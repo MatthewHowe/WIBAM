@@ -158,7 +158,7 @@ class opts(object):
                              help='multi scale test augmentation.')
     self.parser.add_argument('--nms', action='store_true',
                              help='run nms in testing.')
-    self.parser.add_argument('--K', type=int, default=50 ,
+    self.parser.add_argument('--K', type=int, default=128 ,
                              help='max number of output objects.') 
     self.parser.add_argument('--not_prefetch_test', action='store_true',
                              help='not use parallal data pre-processing.')
@@ -422,7 +422,7 @@ class opts(object):
     default_dataset_info = {
       'ctdet': 'coco', 'multi_pose': 'coco_hp', 'ddd': 'nuscenes',
       'tracking,ctdet': 'coco', 'tracking,multi_pose': 'coco_hp', 
-      'tracking,ddd': 'nuscenes'
+      'tracking,ddd': 'nuscenes', 'WIBAM, ddd': 'wibam'
     }
     opt = self.parse()
     from dataset.dataset_factory import dataset_factory

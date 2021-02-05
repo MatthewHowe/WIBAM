@@ -18,38 +18,39 @@ from utils.image import gaussian_radius, draw_umich_gaussian
 
 class WIBAM(GenericDataset):
   # ## ORIGINAL
-  # default_resolution = [448, 800]
-  # num_categories = 10
-  # class_name = [
-  #   'car', 'truck', 'bus', 'trailer', 
-  #   'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
-  #   'traffic_cone', 'barrier']
-  # cat_ids = {i + 1: i + 1 for i in range(num_categories)}
-  # focal_length = 1046
-  # max_objs = 50
-  # _tracking_ignored_class = ['construction_vehicle', 'traffic_cone', 'barrier']
-  # _vehicles = ['car', 'truck', 'bus', 'trailer', 'construction_vehicle']
-  # _cycles = ['motorcycle', 'bicycle']
-  # _pedestrians = ['pedestrian']
-  # attribute_to_id = {
-  #   '': 0, 'cycle.with_rider' : 1, 'cycle.without_rider' : 2,
-  #   'pedestrian.moving': 3, 'pedestrian.standing': 4, 
-  #   'pedestrian.sitting_lying_down': 5,
-  #   'vehicle.moving': 6, 'vehicle.parked': 7, 
-  #   'vehicle.stopped': 8}
-  # id_to_attribute = {v: k for k, v in attribute_to_id.items()}
+  default_resolution = [448, 800]
+  num_categories = 10
+  class_name = [
+    'car', 'truck', 'bus', 'trailer', 
+    'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
+    'traffic_cone', 'barrier']
+  cat_ids = {i + 1: i + 1 for i in range(num_categories)}
+  focal_length = 1024
+  original_resolution = [1080,1920]
+  max_objs = 128
+  _tracking_ignored_class = ['construction_vehicle', 'traffic_cone', 'barrier']
+  _vehicles = ['car', 'truck', 'bus', 'trailer', 'construction_vehicle']
+  _cycles = ['motorcycle', 'bicycle']
+  _pedestrians = ['pedestrian']
+  attribute_to_id = {
+    '': 0, 'cycle.with_rider' : 1, 'cycle.without_rider' : 2,
+    'pedestrian.moving': 3, 'pedestrian.standing': 4, 
+    'pedestrian.sitting_lying_down': 5,
+    'vehicle.moving': 6, 'vehicle.parked': 7, 
+    'vehicle.stopped': 8}
+  id_to_attribute = {v: k for k, v in attribute_to_id.items()}
 
-  # WIBAM
-  num_categories = 1
-  focal_length = 1046
-  default_resolution = [448 , 800]
-  # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
-  #       'Tram', 'Misc', 'DontCare']
-  class_name = ['car']
-  # negative id is for "not as negative sample for abs(id)".
-  # 0 for ignore losses for all categories in the bounding box region
-  cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
-  max_objs = 50
+  # # WIBAM
+  # num_categories = 1
+  # focal_length = 1046
+  # default_resolution = [448 , 800]
+  # # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
+  # #       'Tram', 'Misc', 'DontCare']
+  # class_name = ['car']
+  # # negative id is for "not as negative sample for abs(id)".
+  # # 0 for ignore losses for all categories in the bounding box region
+  # cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
+  # max_objs = 50
 
   # Initialisation function
   def __init__(self, opt, split):
@@ -70,7 +71,7 @@ class WIBAM(GenericDataset):
         'annotations', 'wibam_{}.json').format(split, opt.dataset_version)
     else:
       ann_path = os.path.join(data_dir,
-        'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version)
+        'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version) 
 
     self.images = None
     # load image list and coco
@@ -447,6 +448,7 @@ class WIBAM(GenericDataset):
 
         file_name = img_info['file_name']
         img_path = os.path.join(img_dir, file_name)
+        # if self.opt.show_repro is True:
         drawing_images.append(cv2.imread(img_path))
 
         # Use coco utils to get annotation IDs for image instance
@@ -472,36 +474,63 @@ class WIBAM(GenericDataset):
   def convert_eval_format(self, all_bboxes):
     pass
 
-  def save_results(self, results, save_dir):
-    results_dir = os.path.join(save_dir, 'results_kitti')
-    if not os.path.exists(results_dir):
-      os.mkdir(results_dir)
-    for img_id in results.keys():
-      out_path = os.path.join(results_dir, '{:06d}.txt'.format(img_id))
-      f = open(out_path, 'w')
-      for i in range(len(results[img_id])):
-        item = results[img_id][i]
-        category_id = item['class']
-        cls_name_ind = category_id
-        class_name = self.class_name[cls_name_ind - 1]
-        if not ('alpha' in item):
-          item['alpha'] = -1
-        if not ('rot_y' in item):
-          item['rot_y'] = -1
-        if 'dim' in item:
-          item['dim'] = [max(item['dim'][0], 0.01), 
-            max(item['dim'][1], 0.01), max(item['dim'][2], 0.01)]
-        if not ('dim' in item):
-          item['dim'] = [-1000, -1000, -1000]
-        if not ('loc' in item):
-          item['loc'] = [-1000, -1000, -1000]
-        f.write('{} 0.0 0'.format(class_name))
-        f.write(' {:.2f}'.format(item['alpha']))
-        f.write(' {:.2f} {:.2f} {:.2f} {:.2f}'.format(
-          item['bbox'][0], item['bbox'][1], item['bbox'][2], item['bbox'][3]))
-        f.write(' {:.2f} {:.2f} {:.2f}'.format(
-          item['dim'][0], item['dim'][1], item['dim'][2]))
-        f.write(' {:.2f} {:.2f} {:.2f}'.format(
-          item['loc'][0], item['loc'][1], item['loc'][2]))
-        f.write(' {:.2f} {:.2f}\n'.format(item['rot_y'], item['score']))
-      f.close()
+  # def save_results(self, results, save_dir):
+  #   results_dir = os.path.join(save_dir, 'results_kitti')
+  #   if not os.path.exists(results_dir):
+  #     os.mkdir(results_dir)
+  #   for img_id in results.keys():
+  #     out_path = os.path.join(results_dir, '{:06d}.txt'.format(img_id))
+  #     f = open(out_path, 'w')
+  #     for i in range(len(results[img_id])):
+  #       item = results[img_id][i]
+  #       category_id = item['class']
+  #       cls_name_ind = category_id
+  #       class_name = self.class_name[cls_name_ind - 1]
+  #       if not ('alpha' in item):
+  #         item['alpha'] = -1
+  #       if not ('rot_y' in item):
+  #         item['rot_y'] = -1
+  #       if 'dim' in item:
+  #         item['dim'] = [max(item['dim'][0], 0.01), 
+  #           max(item['dim'][1], 0.01), max(item['dim'][2], 0.01)]
+  #       if not ('dim' in item):
+  #         item['dim'] = [-1000, -1000, -1000]
+  #       if not ('loc' in item):
+  #         item['loc'] = [-1000, -1000, -1000]
+  #       f.write('{} 0.0 0'.format(class_name))
+  #       f.write(' {:.2f}'.format(item['alpha']))
+  #       f.write(' {:.2f} {:.2f} {:.2f} {:.2f}'.format(
+  #         item['bbox'][0], item['bbox'][1], item['bbox'][2], item['bbox'][3]))
+  #       f.write(' {:.2f} {:.2f} {:.2f}'.format(
+  #         item['dim'][0], item['dim'][1], item['dim'][2]))
+  #       f.write(' {:.2f} {:.2f} {:.2f}'.format(
+  #         item['loc'][0], item['loc'][1], item['loc'][2]))
+  #       f.write(' {:.2f} {:.2f}\n'.format(item['rot_y'], item['score']))
+  #     f.close()
+
+  def save_results(self, results, save_dir, task):
+    json.dump(self.convert_eval_format(results), 
+                open('{}/results_nuscenes_{}.json'.format(save_dir, task), 'w'))
+
+
+  def run_eval(self, results, save_dir):
+    task = 'tracking' if self.opt.tracking else 'det'
+    self.save_results(results, save_dir, task)
+    if task == 'det':
+      os.system('python ' + \
+        'src/tools/nuscenes-devkit/python-sdk/nuscenes/eval/detection/evaluate.py ' +\
+        '{}/results_nuscenes_{}.json '.format(save_dir, task) + \
+        '--output_dir {}/nuscenes_eval_det_output/ '.format(save_dir) + \
+        '--dataroot data/nuscenes/v1.0-trainval/ ' + \
+        '--plot_examples=0')
+    else:
+      os.system('python ' + \
+        'src/tools/nuscenes-devkit/python-sdk/nuscenes/eval/tracking/evaluate.py ' +\
+        '{}/results_nuscenes_{}.json '.format(save_dir, task) + \
+        '--output_dir {}/nuscenes_evaltracl__output/ '.format(save_dir) + \
+        '--dataroot ../data/nuscenes/v1.0-trainval/')
+      os.system('python ' + \
+        'src/tools/nuscenes-devkit/python-sdk-alpha02/nuscenes/eval/tracking/evaluate.py ' +\
+        '{}/results_nuscenes_{}.json '.format(save_dir, task) + \
+        '--output_dir {}/nuscenes_evaltracl__output/ '.format(save_dir) + \
+        '--dataroot ../data/nuscenes/v1.0-trainval/')

@@ -17,6 +17,7 @@ from .datasets.nuscenes import nuScenes
 from .datasets.crowdhuman import CrowdHuman
 from .datasets.kitti_tracking import KITTITracking
 from .datasets.custom_dataset import CustomDataset
+from .datasets.nuscenes_1cls import nuScenes_1cls
 
 
 dataset_factory = {
@@ -28,7 +29,8 @@ dataset_factory = {
   'nuscenes': nuScenes,
   'crowdhuman': CrowdHuman,
   'kitti_tracking': KITTITracking,
-  'wibam': WIBAM
+  'wibam': WIBAM,
+  'nuscenes_1cls': nuScenes_1cls
 }
 
 

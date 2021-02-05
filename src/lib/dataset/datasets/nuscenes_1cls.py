@@ -17,13 +17,10 @@ import copy
 from ..generic_dataset import GenericDataset
 from utils.ddd_utils import compute_box_3d, project_to_image
 
-class nuScenes(GenericDataset):
+class nuScenes_1cls(GenericDataset):
   default_resolution = [448, 800]
-  num_categories = 10
-  class_name = [
-    'car', 'truck', 'bus', 'trailer', 
-    'construction_vehicle', 'pedestrian', 'motorcycle', 'bicycle',
-    'traffic_cone', 'barrier']
+  num_categories = 1
+  class_name = ['car']
   cat_ids = {i + 1: i + 1 for i in range(num_categories)}
   focal_length = 1266
   max_objs = 128
@@ -55,7 +52,7 @@ class nuScenes(GenericDataset):
         'annotations', '{}{}.json').format(opt.dataset_version, split_name)
 
     self.images = None
-    super(nuScenes, self).__init__(opt, split, ann_path, img_dir)
+    super(nuScenes_1cls, self).__init__(opt, split, ann_path, img_dir)
 
     self.alpha_in_degree = False    
     self.num_samples = len(self.images)
