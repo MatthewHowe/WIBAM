@@ -192,10 +192,14 @@ class ModleWithLoss(torch.nn.Module):
 
 class Trainer(object):
   def __init__(
-    self, opt, model, writer, total_writer, optimizer=None):
+    self, opt, model, writer, total_writer, optimizer=None, dataset=None):
     self.opt = opt
     self.optimizer = optimizer
-    self.loss_stats, self.loss = self._get_losses(opt)
+    self.loss_stats, self.loss = self._get_losses(opt, dataset)
+    if dataset is not None:
+      self.dataset = dataset
+    else:
+      self.dataset = opt.dataset
     self.model_with_loss = ModleWithLoss(model, self.loss)
     self.writer = writer
     self.total_writer = total_writer
@@ -288,9 +292,9 @@ class Trainer(object):
             continue
           else:
             if phase == "train":
-              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_train)
+              self.writer.add_scalar("{}: {}_{}".format(self.dataset,l,phase), avg_loss_stats[l].val, self.total_steps_train)
             elif phase == "val":
-              self.writer.add_scalar("{}_{}".format(l,phase), avg_loss_stats[l].val, self.total_steps_val)
+              self.writer.add_scalar("{}: {}_{}".format(self.dataset,l,phase), avg_loss_stats[l].val, self.total_steps_val)
       for l, val in avg_loss_stats.items():
         Bar.suffix = Bar.suffix + '|{} {:.2f} '.format(l, avg_loss_stats[l].avg)
       Bar.suffix = Bar.suffix + '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
@@ -315,13 +319,15 @@ class Trainer(object):
     #
     bar.finish()
     for loss, value in avg_loss_stats.items():
-      self.total_writer.add_scalar("{}_{}".format(phase, loss), value.avg, epoch)
+      self.total_writer.add_scalar("EPOCH AV {}: {}_{}".format(self.dataset,phase, loss), value.avg, epoch)
     ret = {k: v.avg for k, v in avg_loss_stats.items()}
     ret['time'] = bar.elapsed_td.total_seconds() / 60.
     return ret, results
   
-  def _get_losses(self, opt):
-    if opt.dataset == "wibam":
+  def _get_losses(self, opt, dataset=None):
+    if dataset is None:
+      dataset=opt.dataset
+    if dataset == "wibam":
       loss_order = ['hm', 'wh', 'reg']
       loss_states = ['tot','mv'] + [i for i in loss_order if i in opt.heads]
       loss = MultiviewLoss(opt)

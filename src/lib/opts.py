@@ -150,6 +150,12 @@ class opts(object):
                               help='Use detection camera loss only')
     self.parser.add_argument('--mv_only', action='store_true', 
                               help="Use only Multiview loss in training")
+    self.parser.add_argument('--mixed_learning', action='store_true',
+                              help="Whether or not to use multiple trianing datasets")
+    self.parser.add_argument('--mixed_schedule', default=-1,
+                              help='When to switch datasets, ie 3 on one, 2 on the other (3,2)')
+    self.parser.add_argument('--mixed_dataset', default=-1,
+                              help='What dataset to mix with')
 
     # test
     self.parser.add_argument('--flip_test', action='store_true',
