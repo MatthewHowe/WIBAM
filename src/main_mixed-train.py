@@ -133,16 +133,16 @@ def main(opt):
   for training_set in range(start_epoch + 1, training_sets + 1):
     mark = epoch if opt.save_all else 'last'
 
-    # Do a round of validation
-    save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
-                epoch, model, optimizer)     
-    with torch.no_grad():
-      log_dict_val, preds = trainer.val(epoch, val_loader)
-      if opt.eval_val:
-        val_loader.dataset.run_eval(preds, opt.save_dir)
-    for k, v in log_dict_val.items():
-      logger.scalar_summary('val_{}'.format(k), v, epoch)
-      logger.write('{} {:8f} | '.format(k, v))
+    # # Do a round of validation
+    # save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
+    #             epoch, model, optimizer)     
+    # with torch.no_grad():
+    #   log_dict_val, preds = trainer.val(epoch, val_loader)
+    #   if opt.eval_val:
+    #     val_loader.dataset.run_eval(preds, opt.save_dir)
+    # for k, v in log_dict_val.items():
+    #   logger.scalar_summary('val_{}'.format(k), v, epoch)
+    #   logger.write('{} {:8f} | '.format(k, v))
 
     # Complete training on first dataset
     for _ in range(opt.mixed_schedule[0]):
@@ -171,16 +171,16 @@ def main(opt):
 
       finished = epoch >= opt.num_epochs
     
-    # Complete a validation set to see improvement
-    save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
-                epoch, model, optimizer)     
-    with torch.no_grad():
-      log_dict_val, preds = trainer.val(epoch, val_loader)
-      if opt.eval_val:
-        val_loader.dataset.run_eval(preds, opt.save_dir)
-    for k, v in log_dict_val.items():
-      logger.scalar_summary('val_{}'.format(k), v, epoch)
-      logger.write('{} {:8f} | '.format(k, v))
+    # # Complete a validation set to see improvement
+    # save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
+    #             epoch, model, optimizer)     
+    # with torch.no_grad():
+    #   log_dict_val, preds = trainer.val(epoch, val_loader)
+    #   if opt.eval_val:
+    #     val_loader.dataset.run_eval(preds, opt.save_dir)
+    # for k, v in log_dict_val.items():
+    #   logger.scalar_summary('val_{}'.format(k), v, epoch)
+    #   logger.write('{} {:8f} | '.format(k, v))
 
     # Complete training on second dataset
     for _ in range(opt.mixed_schedule[1]):
