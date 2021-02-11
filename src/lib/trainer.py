@@ -104,6 +104,12 @@ class MultiviewLoss(torch.nn.Module):
     self.RegWeightedL1Loss = RegWeightedL1Loss()
     self.ReprojectionLoss = ReprojectionLoss(opt)
     self.opt = opt
+    self.losses = {}
+    # reset all losses to zero
+    if self.opt.mv_only:
+      self.losses = {'mv':0, 'tot':0}
+    else:
+      self.losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
 
   def _sigmoid_output(self, output):
     if 'hm' in output:
@@ -126,11 +132,9 @@ class MultiviewLoss(torch.nn.Module):
       losses (list): list of individual losses
     """
     opt = self.opt
-    # reset all losses to zero
-    if self.opt.mv_only:
-      losses = {'mv':0, 'tot':0}
-    else:
-      losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    # set losses to 0
+    for key in self.losses.keys():
+      self.losses[key] = 0
     
     
     # Stacks == 1 unless Hourglass == 2
@@ -172,8 +176,10 @@ class MultiviewLoss(torch.nn.Module):
           losses['tot'] += val * self.opt.weights[key]
 
       for key, val in mv_loss.items():
+        if key not in self.losses.keys():
+          self.losses["mv_{}".format(key)] = 0
         if key != 'tot':
-          losses["mv_{}".format(key)] = val
+          self.losses["mv_{}".format(key)] = val
 
       return losses['tot'], losses
 
@@ -300,7 +306,7 @@ class Trainer(object):
       Bar.suffix = Bar.suffix + '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar
         if iter_id % opt.print_iter == 0:
-          print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix)) 
+          print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix), end='\r') 
       else:
         bar.next()
 
