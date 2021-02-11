@@ -77,6 +77,7 @@ def main(opt):
   # Initialise trainer class
   if opt.mixed_learning:
     mixed_trainer = Trainer(opt, model, mixed_writer, mixed_total_writer, optimizer, opt.mixed_dataset)
+    mixed_trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
 
   trainer = Trainer(opt, model, writer, total_writer, optimizer)
   trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
