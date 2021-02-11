@@ -145,13 +145,14 @@ def main(opt):
       logger.scalar_summary('val_{}'.format(k), v, epoch)
       logger.write('{} {:8f} | '.format(k, v))
 
-    # Complete training on first dataset
-    for _ in range(opt.mixed_schedule[0]):
+    # Complete training on second dataset
+    for _ in range(opt.mixed_schedule[1]):
       if finished is True:
         break
       # Complete training step
-      log_dict_train, _ = trainer.train(epoch, train_loader)
+      log_dict_train, _ = mixed_trainer.train(epoch, mixed_loader)
       logger.write('epoch: {} |'.format(epoch))
+
       # Write log
       for k, v in log_dict_train.items():
         logger.scalar_summary('train_{}'.format(k), v, epoch)
@@ -161,7 +162,7 @@ def main(opt):
       if epoch in opt.save_point:
         save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)), 
                   epoch, model, optimizer)
-
+      
       if epoch in opt.lr_step:
         lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
         print('Drop LR to', lr)
@@ -187,14 +188,13 @@ def main(opt):
       logger.scalar_summary('val_{}'.format(k), v, epoch)
       logger.write('{} {:8f} | '.format(k, v))
 
-    # Complete training on second dataset
-    for _ in range(opt.mixed_schedule[1]):
+    # Complete training on first dataset
+    for _ in range(opt.mixed_schedule[0]):
       if finished is True:
         break
       # Complete training step
-      log_dict_train, _ = mixed_trainer.train(epoch, mixed_loader)
+      log_dict_train, _ = trainer.train(epoch, train_loader)
       logger.write('epoch: {} |'.format(epoch))
-
       # Write log
       for k, v in log_dict_train.items():
         logger.scalar_summary('train_{}'.format(k), v, epoch)
@@ -204,7 +204,7 @@ def main(opt):
       if epoch in opt.save_point:
         save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)), 
                   epoch, model, optimizer)
-      
+
       if epoch in opt.lr_step:
         lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
         print('Drop LR to', lr)
