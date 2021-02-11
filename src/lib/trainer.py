@@ -132,10 +132,6 @@ class MultiviewLoss(torch.nn.Module):
       losses (list): list of individual losses
     """
     opt = self.opt
-    # set losses to 0
-    for key in self.losses.keys():
-      self.losses[key] = 0
-    
     
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
@@ -167,13 +163,13 @@ class MultiviewLoss(torch.nn.Module):
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
       if 'tot' not in mv_loss:
-        losses['mv'] = 1e6
+        self.losses['mv'] = 1e6
       else:
-        losses['mv'] += mv_loss['tot']
+        self.losses['mv'] = mv_loss['tot']
 
       for key, val in losses.items():
         if key != 'tot':
-          losses['tot'] += val * self.opt.weights[key]
+          self.losses['tot'] += val * self.opt.weights[key]
 
       for key, val in mv_loss.items():
         if key not in self.losses.keys():
@@ -181,7 +177,7 @@ class MultiviewLoss(torch.nn.Module):
         if key != 'tot':
           self.losses["mv_{}".format(key)] = val
 
-      return losses['tot'], losses
+      return self.losses['tot'], self.losses
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
