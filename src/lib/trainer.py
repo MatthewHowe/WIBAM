@@ -243,7 +243,6 @@ class Trainer(object):
     # Training loop
     for iter_id, batch in enumerate(data_loader):
       #  Break if epoch complete
-      num_iters = 50
       if iter_id >= num_iters:
         break
 
