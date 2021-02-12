@@ -104,14 +104,7 @@ class MultiviewLoss(torch.nn.Module):
     self.RegWeightedL1Loss = RegWeightedL1Loss()
     self.ReprojectionLoss = ReprojectionLoss(opt)
     self.opt = opt
-    self.losses = {}
-    # reset all losses to zero
-    if self.opt.mv_only:
-      self.losses = {'mv':0, 'tot':0}
-      self.base_losses = {'mv':0, 'tot':0}
-    else:
-      self.losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
-      self.base_losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    self.loss_stats = {}
 
   def _sigmoid_output(self, output):
     if 'hm' in output:
@@ -134,6 +127,12 @@ class MultiviewLoss(torch.nn.Module):
       losses (list): list of individual losses
     """
     opt = self.opt
+    # reset all losses to zero
+    if self.opt.mv_only:
+      losses = {'mv':0, 'tot':0}
+    else:
+      losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+    
     
     # Stacks == 1 unless Hourglass == 2
     for s in range(opt.num_stacks):
@@ -152,45 +151,48 @@ class MultiviewLoss(torch.nn.Module):
 
         for head in regression_heads:
           if head in output:
-            self.losses[head] += self.RegWeightedL1Loss(
+            losses[head] += self.RegWeightedL1Loss(
               output[head], batch[head + '_mask'],
               batch['ind'], batch[head]) / opt.num_stacks
 
         # Heatmap loss
         if 'hm' in output:
-          self.losses['hm'] += self.FastFocalLoss(
+          losses['hm'] += self.FastFocalLoss(
             output['hm'], batch['hm'], batch['ind'],
             mask, cat) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
-      if 'tot' in mv_loss:
-        self.losses['mv'] = mv_loss['tot']
+      if 'tot' not in mv_loss:
+        losses['mv'] = 1e6
+      else:
+        losses['mv'] += mv_loss['tot']
 
-      for key, val in self.base_losses.items():
+      for key, val in losses.items():
         if key != 'tot':
-          self.losses['tot'] += self.losses[key] * self.opt.weights[key]
+          losses['tot'] += val * self.opt.weights[key]
 
       for key, val in mv_loss.items():
-        if key not in self.losses.keys():
-          self.losses["mv_{}".format(key)] = 0
         if key != 'tot':
-          self.losses["mv_{}".format(key)] = val
+          losses["mv_{}".format(key)] = val
+      self.loss_stats = losses
 
-      return self.losses['tot'], self.losses
+      return losses['tot']
 
 class ModleWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
     super(ModleWithLoss, self).__init__()
     self.model = model
     self.loss = loss
+    self.loss_stats = {}
 
   def forward(self, batch):
     pre_img = batch['pre_img'] if 'pre_img' in batch else None
     pre_hm = batch['pre_hm'] if 'pre_hm' in batch else None
     outputs = self.model(batch['image'], pre_img, pre_hm)
-    loss, loss_stats = self.loss(outputs, batch)
-    return outputs[-1], loss, loss_stats
+    loss = self.loss(outputs, batch)
+    self.loss_stats = self.loss.loss_stats
+    return outputs[-1], loss
 
 class Trainer(object):
   def __init__(
@@ -257,7 +259,8 @@ class Trainer(object):
 
       # Run outputs for batch from model with losses
       # Loss is the total loss for the batch
-      output, loss, loss_stats = model_with_loss(batch)
+      output, loss = model_with_loss(batch)
+      loss_stats = model_with_loss.loss_stats
 
       # If training phase, back propogate the loss
       if phase == 'train':
