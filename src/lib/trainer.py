@@ -175,23 +175,26 @@ class MultiviewLoss(torch.nn.Module):
       for key, val in mv_loss.items():
         if key != 'tot':
           losses["mv_{}".format(key)] = val
-      self.loss_stats = losses
 
-      return losses['tot']
+      return losses['tot'], losses
+
+class LossStats():
+  def __init__(self):
+    self.loss_stats = {}
 
 class ModleWithLoss(torch.nn.Module):
-  def __init__(self, model, loss):
+  def __init__(self, model, loss, LStats):
     super(ModleWithLoss, self).__init__()
     self.model = model
     self.loss = loss
-    self.loss_stats = {}
+    self.LStats = LStats
 
   def forward(self, batch):
     pre_img = batch['pre_img'] if 'pre_img' in batch else None
     pre_hm = batch['pre_hm'] if 'pre_hm' in batch else None
     outputs = self.model(batch['image'], pre_img, pre_hm)
-    loss = self.loss(outputs, batch)
-    self.loss_stats = self.loss.loss_stats
+    loss, loss_stats = self.loss(outputs, batch)
+    self.LStats.loss_stats = loss_stats
     return outputs[-1], loss
 
 class Trainer(object):
@@ -204,7 +207,8 @@ class Trainer(object):
       self.dataset = dataset
     else:
       self.dataset = opt.dataset
-    self.model_with_loss = ModleWithLoss(model, self.loss)
+    self.LStats = LossStats()
+    self.model_with_loss = ModleWithLoss(model, self.loss, self.LStats)
     self.writer = writer
     self.total_writer = total_writer
     self.total_steps_train = 0
@@ -260,7 +264,7 @@ class Trainer(object):
       # Run outputs for batch from model with losses
       # Loss is the total loss for the batch
       output, loss = model_with_loss(batch)
-      loss_stats = model_with_loss.loss_stats
+      loss_stats = self.LStats.loss_stats
 
       # If training phase, back propogate the loss
       if phase == 'train':
