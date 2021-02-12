@@ -108,8 +108,10 @@ class MultiviewLoss(torch.nn.Module):
     # reset all losses to zero
     if self.opt.mv_only:
       self.losses = {'mv':0, 'tot':0}
+      self.base_losses = {'mv':0, 'tot':0}
     else:
       self.losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
+      self.base_losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
 
   def _sigmoid_output(self, output):
     if 'hm' in output:
@@ -150,26 +152,24 @@ class MultiviewLoss(torch.nn.Module):
 
         for head in regression_heads:
           if head in output:
-            losses[head] += self.RegWeightedL1Loss(
+            self.losses[head] += self.RegWeightedL1Loss(
               output[head], batch[head + '_mask'],
               batch['ind'], batch[head]) / opt.num_stacks
 
         # Heatmap loss
         if 'hm' in output:
-          losses['hm'] += self.FastFocalLoss(
+          self.losses['hm'] += self.FastFocalLoss(
             output['hm'], batch['hm'], batch['ind'],
             mask, cat) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
-      if 'tot' not in mv_loss:
-        self.losses['mv'] = 1e6
-      else:
+      if 'tot' in mv_loss:
         self.losses['mv'] = mv_loss['tot']
 
-      for key, val in losses.items():
+      for key, val in self.base_losses.items():
         if key != 'tot':
-          self.losses['tot'] += val * self.opt.weights[key]
+          self.losses['tot'] += self.losses[key] * self.opt.weights[key]
 
       for key, val in mv_loss.items():
         if key not in self.losses.keys():
