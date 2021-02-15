@@ -309,7 +309,8 @@ class Trainer(object):
       Bar.suffix = Bar.suffix + '|Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
       if opt.print_iter > 0: # If not using progress bar
         if iter_id % opt.print_iter == 0:
-          print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix), end='\r') 
+          print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix))
+          print('\r') 
       else:
         bar.next()
 
