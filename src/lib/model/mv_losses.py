@@ -128,7 +128,7 @@ class ReprojectionLoss(nn.Module):
                                              1920, (200,112), BN, max_objects)
 
     # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30)
-    detections['depth'] = decoded_output['dep'] * 0.82
+    detections['depth'] = decoded_output['dep'] * 0.80
     # detections['depth'] = decoded_output['dep']
     detections['size'] = decoded_output['dim'] 
     detections['rot'] = decoded_output['rot']
@@ -257,5 +257,5 @@ class ReprojectionLoss(nn.Module):
         cv2.waitKey(0)
 
     self.profiler.pause()
-    # self.profiler.print_interval_times()
+    self.profiler.print_interval_times()
     return mv_loss
