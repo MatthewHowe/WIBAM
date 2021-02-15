@@ -313,7 +313,7 @@ class Trainer(object):
           print('\n')
       else:
         bar.next()
-        print('\r')
+        print(' ')
 
       #
       if opt.debug > 0:
