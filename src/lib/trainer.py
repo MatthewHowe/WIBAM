@@ -310,7 +310,7 @@ class Trainer(object):
       if opt.print_iter > 0: # If not using progress bar
         if iter_id % opt.print_iter == 0:
           print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix))
-          print('\r') 
+          print('\n')
       else:
         bar.next()
 
