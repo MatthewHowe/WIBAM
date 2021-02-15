@@ -258,5 +258,5 @@ class ReprojectionLoss(nn.Module):
         cv2.waitKey(0)
 
     self.profiler.pause()
-    self.profiler.print_interval_times()
+    # self.profiler.print_interval_times()
     return mv_loss
