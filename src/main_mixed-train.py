@@ -18,6 +18,7 @@ from logger import Logger
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import get_dataset
 from trainer import Trainer
+from utils.utils import Profiler
 
 from utils.net import *
 

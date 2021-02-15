@@ -18,6 +18,7 @@ from model.decode import generic_decode
 from model.utils import _sigmoid, flip_tensor, flip_lr_off, flip_lr
 from utils.debugger import Debugger
 from utils.post_process import generic_post_process
+from utils.utils import Profiler
 
 class GenericLoss(torch.nn.Module):
   def __init__(self, opt):
@@ -247,13 +248,16 @@ class Trainer(object):
     bar = Bar('{}/{}'.format(opt.task, opt.exp_id), max=num_iters)
     bar.width = 5
     end = time.time()
+    self.profiler = Profiler()
+    self.profiler.start()
 
     # Training loop
     for iter_id, batch in enumerate(data_loader):
+      self.profiler.interval_trigger("Load data")
       #  Break if epoch complete
       if iter_id >= num_iters:
         break
-      
+
       data_time.update(time.time() - end)
       end = time.time()
 
@@ -262,10 +266,14 @@ class Trainer(object):
         if k != 'meta' and k != 'calib' and k != 'drawing_images':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
+      self.profiler.interval_trigger("Data to GPU")
+
       # Run outputs for batch from model with losses
       # Loss is the total loss for the batch
       output, loss = model_with_loss(batch)
       loss_stats = self.LStats.loss_stats
+
+      self.profiler.interval_trigger("Run model")
 
       # If training phase, back propogate the loss
       if phase == 'train':
@@ -273,7 +281,9 @@ class Trainer(object):
         self.optimizer.zero_grad()
         
         loss.backward()
+        self.profiler.interval_trigger("Back prop")
         self.optimizer.step()
+        self.profiler.interval_trigger("Optimiser step")
       batch_time.update(time.time() - end)
       end = time.time()
 
@@ -305,6 +315,7 @@ class Trainer(object):
               self.writer.add_scalar("{}: {}_{}".format(self.dataset,l,phase), avg_loss_stats[l].val, self.total_steps_train)
             elif phase == "val":
               self.writer.add_scalar("{}: {}_{}".format(self.dataset,l,phase), avg_loss_stats[l].val, self.total_steps_val)
+
       for l, val in avg_loss_stats.items():
         Bar.suffix = Bar.suffix + '|{} {:.2f} '.format(l, avg_loss_stats[l].avg)
       Bar.suffix = Bar.suffix + 'Data {dt.avg:.3f}s |Net {bt.avg:.3f}s'.format(dt=data_time, bt=batch_time)
@@ -326,7 +337,11 @@ class Trainer(object):
       elif phase == "val":
         self.total_steps_val += 1
 
+      self.profiler.interval_trigger("Finish")
+
       del output, loss, loss_stats
+      self.profiler.print_interval_times()
+      self.profiler.start()
 
     #
     bar.finish()
