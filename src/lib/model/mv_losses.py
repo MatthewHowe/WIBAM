@@ -221,7 +221,7 @@ class ReprojectionLoss(nn.Module):
                 cv2.rectangle(img, (gt_box[0],gt_box[1]), (gt_box[0]+gt_box[2],gt_box[1]+gt_box[3]), colours[pr_index], 2)
                 cv2.rectangle(img, (pr_box[0],pr_box[1]), (pr_box[0]+pr_box[2],pr_box[1]+pr_box[3]), colours[pr_index], 2)
 
-    self.profiler.interval_trigger("Constructing boxes")  
+    self.profiler.interval_trigger("Constructing boxes")
 
     mv_loss = {'tot': 0}
     for key, val in gt_dict.items():

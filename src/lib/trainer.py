@@ -190,11 +190,18 @@ class ModleWithLoss(torch.nn.Module):
     self.loss = loss
     self.LStats = LStats
 
-  def forward(self, batch):
+  def forward(self, batch, profiler=False):
     pre_img = batch['pre_img'] if 'pre_img' in batch else None
     pre_hm = batch['pre_hm'] if 'pre_hm' in batch else None
+    
     outputs = self.model(batch['image'], pre_img, pre_hm)
+    if profiler:
+      profiler.interval_trigger("Run model")
     loss, loss_stats = self.loss(outputs, batch)
+    if profiler:
+      profiler.interval_trigger("Calculate loss")
+    for key, val in loss_stats.items():
+      loss_stats[key] = val.detach()
     self.LStats.loss_stats = loss_stats
     return outputs[-1], loss
 
@@ -342,6 +349,7 @@ class Trainer(object):
       del output, loss, loss_stats
       self.profiler.print_interval_times()
       self.profiler.start()
+      torch.cuda.empty_cache()
 
     #
     bar.finish()
