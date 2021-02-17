@@ -65,11 +65,11 @@ opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
 
 train_loader = torch.utils.data.DataLoader(
       Dataset(opt, 'train'), batch_size=opt.batch_size,
-	  num_workers=8)
+	  num_workers=opt.num_workers)
 
 val_loader = torch.utils.data.DataLoader(
       Dataset(opt, 'val'), batch_size=opt.batch_size,
-	  num_workers=8)
+	  num_workers=opt.num_workers)
 
 # model
 model = LitWIBAM()
