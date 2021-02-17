@@ -196,6 +196,7 @@ class WIBAM(GenericDataset):
             ret, gt_det, cam, obj, cls_id, bbox, ann['bbox'], ann, pred_cam)
 
       ret['mask_det'] = ret['mask'][cam_num]
+      ret['cat_det'] = ret['cat'][cam_num]
 
       if self.opt.debug > 0:
         gt_det = self._format_gt_det(gt_det)

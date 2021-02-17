@@ -99,7 +99,7 @@ class MultiviewLoss(torch.nn.Module):
   Arguments:
       opt (dict): Configuration options
   """
-  def __init__(self, opt):
+  def __init__(self, opt=None):
     super(MultiviewLoss, self).__init__()
     self.FastFocalLoss = FastFocalLoss(opt=opt)
     self.RegWeightedL1Loss = RegWeightedL1Loss()
@@ -140,13 +140,6 @@ class MultiviewLoss(torch.nn.Module):
       output = outputs[s]
       output = self._sigmoid_output(output)
 
-      cat = torch.zeros((len(batch['cam_num']),opt.K),dtype=int).to(device=opt.device, non_blocking=True)
-      mask = torch.zeros((len(batch['cam_num']),opt.K),dtype=int).to(device=opt.device, non_blocking=True)
-
-      for i in range(len(batch['cam_num'])):
-        cat[i] = batch['cat'][i][batch['cam_num'][i]]
-        mask[i] = batch['mask'][i][batch['cam_num'][i]]
-
       if not self.opt.mv_only:
         regression_heads = ['reg', 'wh']
 
@@ -160,7 +153,7 @@ class MultiviewLoss(torch.nn.Module):
         if 'hm' in output:
           losses['hm'] += self.FastFocalLoss(
             output['hm'], batch['hm'], batch['ind'],
-            mask, cat) / opt.num_stacks
+            batch['mask_det'], batch['cat_det']) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
@@ -277,10 +270,10 @@ class Trainer(object):
 
       # Run outputs for batch from model with losses
       # Loss is the total loss for the batch
-      output, loss = model_with_loss(batch)
+      output, loss = model_with_loss(batch, self.profiler)
       loss_stats = self.LStats.loss_stats
 
-      self.profiler.interval_trigger("Run model")
+      # self.profiler.interval_trigger("Run model")
 
       # If training phase, back propogate the loss
       if phase == 'train':
