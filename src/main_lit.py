@@ -77,5 +77,5 @@ state_dict = torch.load(opt.load_model)
 state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 model.load_state_dict(state_dict['state_dict'])
 # training
-trainer = pl.Trainer(gpus=opt.gpus)
+trainer = pl.Trainer(gpus=opt.num_gpus)
 trainer.fit(model, train_loader, val_loader)

@@ -42,6 +42,7 @@ class opts(object):
     # system
     self.parser.add_argument('--gpus', default='0', 
                              help='-1 for CPU, use comma for multiple gpus')
+    self.parser.add_argument('--num_gpus', default=1)
     self.parser.add_argument('--num_workers', type=int, default=8,
                              help='dataloader threads. 0 for single-thread.')
     self.parser.add_argument('--not_cuda_benchmark', action='store_true',
