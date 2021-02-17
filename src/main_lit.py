@@ -79,5 +79,5 @@ if __name__ == '__main__':
 	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 	model.load_state_dict(state_dict['state_dict'])
 	# training
-	trainer = pl.Trainer(gpus=opt.gpus)
+	trainer = pl.Trainer(gpus=opt.gpus, accelerator="ddp")
 	trainer.fit(model, train_loader, val_loader)
