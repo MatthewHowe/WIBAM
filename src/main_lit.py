@@ -72,7 +72,7 @@ val_loader = torch.utils.data.DataLoader(
 	  num_workers=opt.num_workers)
 
 # model
-model = LitWIBAM(gpu)
+model = LitWIBAM()
 state_dict = torch.load(opt.load_model)
 state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 model.load_state_dict(state_dict['state_dict'])
