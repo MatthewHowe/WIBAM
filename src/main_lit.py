@@ -44,7 +44,7 @@ class LitWIBAM(pl.LightningModule):
 
 	def training_step(self, train_batch, batch_idx):
 		x = train_batch['image']
-		z = self.model(x)
+		z = self(x)
 		loss, loss_stats = self.loss(z, train_batch)
 		for key, val in loss_stats.items():
 			self.log("train_{}".format(key), val)
