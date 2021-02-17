@@ -57,25 +57,27 @@ class LitWIBAM(pl.LightningModule):
 		for key, val in loss_stats.items():
 			self.log("val_{}".format(key), val)
 
-opt = opts().parse()
 
-# data
-Dataset = get_dataset(opt.dataset)
-opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+if __name__ == '__main__':
+	opt = opts().parse()
 
-train_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'train'), batch_size=opt.batch_size,
-	  num_workers=opt.num_workers)
+	# data
+	Dataset = get_dataset(opt.dataset)
+	opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
 
-val_loader = torch.utils.data.DataLoader(
-      Dataset(opt, 'val'), batch_size=opt.batch_size,
-	  num_workers=opt.num_workers)
+	train_loader = torch.utils.data.DataLoader(
+		Dataset(opt, 'train'), batch_size=opt.batch_size,
+		num_workers=opt.num_workers)
 
-# model
-model = LitWIBAM()
-state_dict = torch.load(opt.load_model)
-state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
-model.load_state_dict(state_dict['state_dict'])
-# training
-trainer = pl.Trainer(gpus=opt.gpus)
-trainer.fit(model, train_loader, val_loader)
+	val_loader = torch.utils.data.DataLoader(
+		Dataset(opt, 'val'), batch_size=opt.batch_size,
+		num_workers=opt.num_workers)
+
+	# model
+	model = LitWIBAM()
+	state_dict = torch.load(opt.load_model)
+	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
+	model.load_state_dict(state_dict['state_dict'])
+	# training
+	trainer = pl.Trainer(gpus=opt.gpus)
+	trainer.fit(model, train_loader, val_loader)
