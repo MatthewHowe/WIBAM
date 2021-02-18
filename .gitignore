@@ -13,6 +13,9 @@ src/lib/model/networks/DCNv2_04
 src/lib/model/networks/DCNv2_10
 # src/tools/kitti_eval
 
+writeup
+conda_envs/*
+lightning_logs/*
 runs/*
 .idea/
 legacy/*
