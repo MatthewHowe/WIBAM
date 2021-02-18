@@ -46,15 +46,15 @@ class LitWIBAM(pl.LightningModule):
 
 	def training_step(self, train_batch, batch_idx):
 		main_out = self(train_batch[0]['image'])[0]
-		mix_out = self(train_batch[0]['image'])[0]
+		mix_out = self(train_batch[1]['image'])[0]
 
 		main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
 		mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
 		
 		for key, val in main_loss_stats.items():
-			self.log("train_{}".format(key), val)
+			self.log("train_main_{}".format(key), val)
 		for key, val in mix_loss_stats.items():
-			self.log("train_{}".format(key), val)
+			self.log("train_mix_{}".format(key), val)
 		return main_loss + mix_loss
 
 	def validation_step(self, val_batch, batch_idx):
@@ -81,7 +81,9 @@ class ConcatDatasets(torch.utils.data.Dataset):
 		return tuple(out)
 
 	def __len__(self):
-		return len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
+		batch_size = self.dataloaders[0].batch_size + self.dataloaders[1].batch_size
+		length = len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
+		return int(length/batch_size)
 
 if __name__ == '__main__':
 	opt = opts().parse()
@@ -116,5 +118,5 @@ if __name__ == '__main__':
 	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 	model.load_state_dict(state_dict['state_dict'])
 	# training
-	trainer = pl.Trainer(gpus=opt.gpus, accelerator="dp")
+	trainer = pl.Trainer(gpus=opt.gpus, accelerator="ddp")
 	trainer.fit(model, MixedDataloader, val_loader)

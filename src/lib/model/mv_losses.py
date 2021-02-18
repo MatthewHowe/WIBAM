@@ -246,7 +246,7 @@ class ReprojectionLoss(nn.Module):
     # else:
     #   mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
     mv_loss['tot_GIoU'] = mv_loss['tot']
-    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    mv_loss['tot'] = mv_loss['tot'] # * mv_loss['mult']
     
     self.profiler.interval_trigger("Multipling loss")
 
