@@ -45,45 +45,44 @@ class GenericLoss(torch.nn.Module):
     # reset all losses to zero
     losses = {head: 0 for head in opt.heads}
 
-    # Stacks == 1 unless Hourglass == 2
-    for s in range(opt.num_stacks):
-      output = outputs[s]
-      output = self._sigmoid_output(output)
 
-      # Heatmap loss
-      if 'hm' in output:
-        losses['hm'] += self.crit(
-          output['hm'], batch['hm'], batch['ind'],
-          batch['mask'], batch['cat']) / opt.num_stacks
+    output = outputs
+    output = self._sigmoid_output(output)
 
-      regression_heads = [
-        'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps',
-        'dep', 'dim', 'amodel_offset', 'velocity']
+    # Heatmap loss
+    if 'hm' in output:
+      losses['hm'] += self.crit(
+        output['hm'], batch['hm'], batch['ind'],
+        batch['mask'], batch['cat']) / opt.num_stacks
 
-      for head in regression_heads:
-        if head in output:
-          losses[head] += self.crit_reg(
-            output[head], batch[head + '_mask'],
-            batch['ind'], batch[head]) / opt.num_stacks
+    regression_heads = [
+      'reg', 'wh', 'tracking', 'ltrb', 'ltrb_amodal', 'hps',
+      'dep', 'dim', 'amodel_offset', 'velocity']
 
-      if 'hm_hp' in output:
-        losses['hm_hp'] += self.crit(
-          output['hm_hp'], batch['hm_hp'], batch['hp_ind'],
-          batch['hm_hp_mask'], batch['joint']) / opt.num_stacks
-        if 'hp_offset' in output:
-          losses['hp_offset'] += self.crit_reg(
-            output['hp_offset'], batch['hp_offset_mask'],
-            batch['hp_ind'], batch['hp_offset']) / opt.num_stacks
+    for head in regression_heads:
+      if head in output:
+        losses[head] += self.crit_reg(
+          output[head], batch[head + '_mask'],
+          batch['ind'], batch[head]) / opt.num_stacks
 
-      if 'rot' in output:
-        losses['rot'] += self.crit_rot(
-          output['rot'], batch['rot_mask'], batch['ind'], batch['rotbin'],
-          batch['rotres']) / opt.num_stacks
+    if 'hm_hp' in output:
+      losses['hm_hp'] += self.crit(
+        output['hm_hp'], batch['hm_hp'], batch['hp_ind'],
+        batch['hm_hp_mask'], batch['joint']) / opt.num_stacks
+      if 'hp_offset' in output:
+        losses['hp_offset'] += self.crit_reg(
+          output['hp_offset'], batch['hp_offset_mask'],
+          batch['hp_ind'], batch['hp_offset']) / opt.num_stacks
 
-      if 'nuscenes_att' in output:
-        losses['nuscenes_att'] += self.crit_nuscenes_att(
-          output['nuscenes_att'], batch['nuscenes_att_mask'],
-          batch['ind'], batch['nuscenes_att']) / opt.num_stacks
+    if 'rot' in output:
+      losses['rot'] += self.crit_rot(
+        output['rot'], batch['rot_mask'], batch['ind'], batch['rotbin'],
+        batch['rotres']) / opt.num_stacks
+
+    if 'nuscenes_att' in output:
+      losses['nuscenes_att'] += self.crit_nuscenes_att(
+        output['nuscenes_att'], batch['nuscenes_att_mask'],
+        batch['ind'], batch['nuscenes_att']) / opt.num_stacks
 
     losses['tot'] = 0
     for head in opt.heads:
@@ -135,25 +134,23 @@ class MultiviewLoss(torch.nn.Module):
       losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
     
     
-    # Stacks == 1 unless Hourglass == 2
-    for s in range(opt.num_stacks):
-      output = outputs[s]
-      output = self._sigmoid_output(output)
+    output = outputs
+    output = self._sigmoid_output(output)
 
-      if not self.opt.mv_only:
-        regression_heads = ['reg', 'wh']
+    if not self.opt.mv_only:
+      regression_heads = ['reg', 'wh']
 
-        for head in regression_heads:
-          if head in output:
-            losses[head] += self.RegWeightedL1Loss(
-              output[head], batch[head + '_mask'],
-              batch['ind'], batch[head]) / opt.num_stacks
+      for head in regression_heads:
+        if head in output:
+          losses[head] += self.RegWeightedL1Loss(
+            output[head], batch[head + '_mask'],
+            batch['ind'], batch[head]) / opt.num_stacks
 
-        # Heatmap loss
-        if 'hm' in output:
-          losses['hm'] += self.FastFocalLoss(
-            output['hm'], batch['hm'], batch['ind'],
-            batch['mask_det'], batch['cat_det']) / opt.num_stacks
+      # Heatmap loss
+      if 'hm' in output:
+        losses['hm'] += self.FastFocalLoss(
+          output['hm'], batch['hm'], batch['ind'],
+          batch['mask_det'], batch['cat_det']) / opt.num_stacks
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)

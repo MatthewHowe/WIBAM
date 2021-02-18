@@ -157,6 +157,8 @@ class opts(object):
                               help='When to switch datasets, ie 3 on one, 2 on the other (3,2)')
     self.parser.add_argument('--mixed_dataset', default=-1,
                               help='What dataset to mix with')
+    self.parser.add_argument('--mixed_batchsize', type=int, default=1,
+                              help="Batchsize to load for the mixed dataloader")
 
     # test
     self.parser.add_argument('--flip_test', action='store_true',

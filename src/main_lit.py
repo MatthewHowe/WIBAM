@@ -23,15 +23,17 @@ from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import get_dataset
 from utils.net import *
 from utils.utils import Profiler
-from trainer import MultiviewLoss
+from trainer import MultiviewLoss, GenericLoss
 
 class LitWIBAM(pl.LightningModule):
 	def __init__(self):
 		super().__init__()
 		opt = opts().parse()
 		Dataset = get_dataset(opt.dataset)
-		self.loss = MultiviewLoss(opt)
 		opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+		self.opt = opt
+		self.main_loss = GenericLoss(opt)
+		self.mix_loss = MultiviewLoss(opt)
 		self.model = create_model(opt.arch, opt.heads, opt.head_conv, opt=opt)
 
 	def forward(self, x):
@@ -43,35 +45,70 @@ class LitWIBAM(pl.LightningModule):
 		return optimizer
 
 	def training_step(self, train_batch, batch_idx):
-		x = train_batch['image']
-		z = self(x)
-		loss, loss_stats = self.loss(z, train_batch)
-		for key, val in loss_stats.items():
+		main_out = self(train_batch[0]['image'])[0]
+		mix_out = self(train_batch[0]['image'])[0]
+
+		main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
+		mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
+		
+		for key, val in main_loss_stats.items():
 			self.log("train_{}".format(key), val)
-		return loss
+		for key, val in mix_loss_stats.items():
+			self.log("train_{}".format(key), val)
+		return main_loss + mix_loss
 
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
 		z = self.model(x)
-		loss, loss_stats = self.loss(z, val_batch)
+		loss, loss_stats = self.main_loss(z, val_batch)
 		for key, val in loss_stats.items():
 			self.log("val_{}".format(key), val)
 
+class ConcatDatasets(torch.utils.data.Dataset):
+	def __init__(self, dataloaders):
+		self.dataloaders = dataloaders
+
+	def __iter__(self):
+		self.loader_iter = []
+		for data_loader in self.dataloaders:
+			self.loader_iter.append(iter(data_loader))
+		return self
+
+	def __next__(self):
+		out = []
+		for data_iter in self.loader_iter:
+			out.append(next(data_iter))
+		return tuple(out)
+
+	def __len__(self):
+		return len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
 
 if __name__ == '__main__':
 	opt = opts().parse()
 
 	# data
-	Dataset = get_dataset(opt.dataset)
-	opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
+	MainDataset = get_dataset(opt.dataset)
+	MixedDataset = get_dataset(opt.mixed_dataset)
+	opt = opts().update_dataset_info_and_set_heads(opt, MainDataset)
 
-	train_loader = torch.utils.data.DataLoader(
-		Dataset(opt, 'train'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers)
+	training_loader = torch.utils.data.DataLoader(
+		MainDataset(opt, 'train'), batch_size=opt.batch_size,
+		num_workers=opt.num_workers
+	)
+
+	print(len(training_loader.dataset))
+
+	mixed_loader = torch.utils.data.DataLoader(
+		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
+		num_workers=opt.num_workers
+	)
 
 	val_loader = torch.utils.data.DataLoader(
-		Dataset(opt, 'val'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers)
+		MainDataset(opt, 'val'), batch_size=opt.batch_size,
+		num_workers=opt.num_workers
+	)
+
+	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
 
 	# model
 	model = LitWIBAM()
@@ -80,4 +117,4 @@ if __name__ == '__main__':
 	model.load_state_dict(state_dict['state_dict'])
 	# training
 	trainer = pl.Trainer(gpus=opt.gpus, accelerator="dp")
-	trainer.fit(model, train_loader, val_loader)
+	trainer.fit(model, MixedDataloader, val_loader)
