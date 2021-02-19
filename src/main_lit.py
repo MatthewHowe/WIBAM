@@ -41,7 +41,7 @@ class LitWIBAM(pl.LightningModule):
 		return output
 
 	def configure_optimizers(self):
-		optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
+		optimizer = torch.optim.Adam(self.parameters(), lr=4.84e-7)
 		return optimizer
 
 	def training_step(self, train_batch, batch_idx):
@@ -56,14 +56,6 @@ class LitWIBAM(pl.LightningModule):
 		for key, val in mix_loss_stats.items():
 			self.log("train_mix_{}".format(key), val)
 		return main_loss + mix_loss
-
-	# def training_epoch_end(self, training_step_outputs):
-	# 	gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
-	# 				"", bucket_prefix_folder="lightning_experiments")
-
-	# def validation_epoch_end(self, validation_step_outputs):
-	# 	gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
-	# 				"", bucket_prefix_folder="lightning_experiments")
 
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
