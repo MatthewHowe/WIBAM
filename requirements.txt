@@ -15,3 +15,5 @@ gsutil
 Cython
 pytorch-lightning
 tensorboard
+tensorflow
+gcsfs
