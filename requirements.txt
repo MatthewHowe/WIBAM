@@ -12,3 +12,6 @@ motmetrics
 scikit-learn
 gs-wrap
 gsutil
+Cython
+pytorch-lightning
+tensorboard
