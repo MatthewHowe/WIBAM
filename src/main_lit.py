@@ -41,7 +41,7 @@ class LitWIBAM(pl.LightningModule):
 		return output
 
 	def configure_optimizers(self):
-		optimizer = torch.optim.Adam(self.parameters(), lr=4.84e-7)
+		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
 		return optimizer
 
 	def training_step(self, train_batch, batch_idx):
