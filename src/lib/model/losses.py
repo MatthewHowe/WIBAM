@@ -168,8 +168,8 @@ def compute_rot_loss(output, target_bin, target_res, mask):
     loss_bin1 = compute_bin_loss(output[:, 0:2], target_bin[:, 0], mask)
     loss_bin2 = compute_bin_loss(output[:, 4:6], target_bin[:, 1], mask)
     loss_res = torch.zeros_like(loss_bin1)
-    if target_bin[:, 0].nonzero().shape[0] > 0:
-        idx1 = target_bin[:, 0].nonzero()[:, 0]
+    if torch.nonzero(target_bin[:, 0]).shape[0] > 0:
+        idx1 = torch.nonzero(target_bin[:, 0])[:, 0]
         valid_output1 = torch.index_select(output, 0, idx1.long())
         valid_target_res1 = torch.index_select(target_res, 0, idx1.long())
         loss_sin1 = compute_res_loss(
@@ -177,8 +177,8 @@ def compute_rot_loss(output, target_bin, target_res, mask):
         loss_cos1 = compute_res_loss(
           valid_output1[:, 3], torch.cos(valid_target_res1[:, 0]))
         loss_res += loss_sin1 + loss_cos1
-    if target_bin[:, 1].nonzero().shape[0] > 0:
-        idx2 = target_bin[:, 1].nonzero()[:, 0]
+    if torch.nonzero(target_bin[:, 1]).shape[0] > 0:
+        idx2 = torch.nonzero(target_bin[:, 1])[:, 0]
         valid_output2 = torch.index_select(output, 0, idx2.long())
         valid_target_res2 = torch.index_select(target_res, 0, idx2.long())
         loss_sin2 = compute_res_loss(

@@ -57,13 +57,13 @@ class LitWIBAM(pl.LightningModule):
 			self.log("train_mix_{}".format(key), val)
 		return main_loss + mix_loss
 
-	def training_epoch_end(self, training_step_outputs):
-		gsutil_sync(True, "aiml-reid-casr-data", Path(opt.output_path),
-					"", bucket_prefix_folder="lightning_experiments")
+	# def training_epoch_end(self, training_step_outputs):
+	# 	gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+	# 				"", bucket_prefix_folder="lightning_experiments")
 
-	def validation_epoch_end(self, validation_step_outputs):
-		gsutil_sync(True, "aiml-reid-casr-data", Path(opt.output_path),
-					"", bucket_prefix_folder="lightning_experiments")
+	# def validation_epoch_end(self, validation_step_outputs):
+	# 	gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+	# 				"", bucket_prefix_folder="lightning_experiments")
 
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
@@ -126,5 +126,6 @@ if __name__ == '__main__':
 	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 	model.load_state_dict(state_dict['state_dict'])
 	# training
-	trainer = pl.Trainer(gpus=opt.gpus, accelerator="ddp", default_save_path=opt.output_dir)
+	trainer = pl.Trainer(default_root_dir=opt.output_path, gpus=opt.gpus, accelerator="ddp")
+	
 	trainer.fit(model, MixedDataloader, val_loader)
