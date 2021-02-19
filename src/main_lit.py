@@ -61,6 +61,10 @@ class LitWIBAM(pl.LightningModule):
 		gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
 					"", bucket_prefix_folder="lightning_experiments")
 
+	def validation_epoch_end(self, validation_step_outputs):
+		gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+					"", bucket_prefix_folder="lightning_experiments")
+
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
 		z = self.model(x)
