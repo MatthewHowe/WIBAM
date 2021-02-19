@@ -58,11 +58,11 @@ class LitWIBAM(pl.LightningModule):
 		return main_loss + mix_loss
 
 	def training_epoch_end(self, training_step_outputs):
-		gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+		gsutil_sync(True, "aiml-reid-casr-data", Path(opt.output_path),
 					"", bucket_prefix_folder="lightning_experiments")
 
 	def validation_epoch_end(self, validation_step_outputs):
-		gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+		gsutil_sync(True, "aiml-reid-casr-data", Path(opt.output_path),
 					"", bucket_prefix_folder="lightning_experiments")
 
 	def validation_step(self, val_batch, batch_idx):
@@ -126,5 +126,5 @@ if __name__ == '__main__':
 	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 	model.load_state_dict(state_dict['state_dict'])
 	# training
-	trainer = pl.Trainer(gpus=opt.gpus, accelerator="ddp")
+	trainer = pl.Trainer(gpus=opt.gpus, accelerator="ddp", default_save_path=opt.output_dir)
 	trainer.fit(model, MixedDataloader, val_loader)
