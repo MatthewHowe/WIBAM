@@ -57,6 +57,10 @@ class LitWIBAM(pl.LightningModule):
 			self.log("train_mix_{}".format(key), val)
 		return main_loss + mix_loss
 
+	def training_epoch_end(self, training_step_outputs):
+		gsutil_sync(True, "aiml-reid-casr-data", Path("lightning_logs"),
+					"", bucket_prefix_folder="lightning_experiments")
+
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
 		z = self.model(x)
