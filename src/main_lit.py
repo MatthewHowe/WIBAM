@@ -55,7 +55,9 @@ class LitWIBAM(pl.LightningModule):
 			self.log("train_main_{}".format(key), val)
 		for key, val in mix_loss_stats.items():
 			self.log("train_mix_{}".format(key), val)
-		return main_loss + mix_loss
+		total_loss = main_loss + mix_loss
+		self.log("train_tot", total_loss)
+		return total_loss
 
 	def validation_step(self, val_batch, batch_idx):
 		x = val_batch['image']
@@ -95,19 +97,19 @@ if __name__ == '__main__':
 
 	training_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'train'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers
+		num_workers=opt.num_workers, drop_last=True
 	)
 
 	print(len(training_loader.dataset))
 
 	mixed_loader = torch.utils.data.DataLoader(
 		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
-		num_workers=opt.num_workers
+		num_workers=opt.num_workers, drop_last=True
 	)
 
 	val_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'val'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers
+		num_workers=opt.num_workers, drop_last=True
 	)
 
 	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
@@ -118,6 +120,9 @@ if __name__ == '__main__':
 	state_dict['state_dict'] = {'model.' + str(key) : val for key, val in state_dict['state_dict'].items()}
 	model.load_state_dict(state_dict['state_dict'])
 	# training
-	trainer = pl.Trainer(default_root_dir=opt.output_path, gpus=opt.gpus, accelerator="ddp")
+	trainer = pl.Trainer(default_root_dir=opt.output_path, 
+						 gpus=opt.gpus, accelerator="ddp",
+						 check_val_every_n_epoch=1,
+						 )
 	
 	trainer.fit(model, MixedDataloader, val_loader)
