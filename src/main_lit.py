@@ -161,7 +161,7 @@ if __name__ == '__main__':
 										  save_top_k=2, mode='min', period=2
 										  )
 	class MyDDP(DDPPlugin):
-		def configure_ddp(self, model, device_ids=opt.gpus):
+		def configure_ddp(self, model, device_ids):
 			model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
 			return model
 	my_ddp = MyDDP()
