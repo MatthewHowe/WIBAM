@@ -107,6 +107,12 @@ class ConcatDatasets(torch.utils.data.Dataset):
 		length = len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
 		return int(length/batch_size)
 
+class MyDDP(DDPPlugin):
+
+    def configure_ddp(self, model, device_ids=device_ids):
+        model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
+        return model
+
 if __name__ == '__main__':
 	opt = opts().parse()
 
@@ -135,12 +141,15 @@ if __name__ == '__main__':
 										  save_top_k=2, mode='min', period=2
 										  )
 
+	my_ddp = MyDDP()
+
 	# training
 	trainer = pl.Trainer(checkpoint_callback=True,
 						 callbacks=[checkpoint_callback],
 						 default_root_dir=opt.output_path, 
 						 gpus=opt.gpus, accelerator="ddp",
 						 check_val_every_n_epoch=1,
+						 plugins=[my_ddp]
 						 )
 	
 	trainer.fit(model, training_loader, val_loader)
