@@ -91,10 +91,8 @@ class LitWIBAM(pl.LightningModule):
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
-		print("\n")
 		variance = torch.var(torch.stack(validation_step_outputs))
 		mean = torch.mean(torch.stack(validation_step_outputs))
-		print("Mean: {}, var: {}".format(mean, variance))
 		self.log("val_variance", variance, on_epoch=True)
 
 	
