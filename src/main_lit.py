@@ -16,6 +16,7 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
 
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
