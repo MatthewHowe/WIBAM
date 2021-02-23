@@ -97,8 +97,7 @@ class LitWIBAM(pl.LightningModule):
 		self.log("val_variance", variance, on_epoch=True)
 
 class MyDDP(DDPPlugin):
-
-    def configure_ddp(self, model, device_ids=device_ids):
+    def configure_ddp(self, model, device_ids):
         model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
         return model
 
