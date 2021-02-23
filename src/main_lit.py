@@ -16,7 +16,7 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
-from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
+from pytorch_lightning.plugins import DDPPlugin
 
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
@@ -105,6 +105,7 @@ class MyDDP(DDPPlugin):
 class ConcatDatasets(torch.utils.data.Dataset):
 	def __init__(self, dataloaders):
 		self.dataloaders = dataloaders
+		self.batch_size = self.dataloaders[0].batch_size + self.dataloaders[1].batch_size
 
 	def __iter__(self):
 		self.loader_iter = []
@@ -119,9 +120,8 @@ class ConcatDatasets(torch.utils.data.Dataset):
 		return tuple(out)
 
 	def __len__(self):
-		batch_size = self.dataloaders[0].batch_size + self.dataloaders[1].batch_size
 		length = len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
-		return int(length/batch_size)
+		return length
 
 if __name__ == '__main__':
 	opt = opts().parse()
