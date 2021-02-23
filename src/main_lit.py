@@ -96,10 +96,7 @@ class LitWIBAM(pl.LightningModule):
 		mean = torch.mean(torch.stack(validation_step_outputs))
 		self.log("val_variance", variance, on_epoch=True)
 
-class MyDDP(DDPPlugin):
-    def configure_ddp(self, model, device_ids):
-        model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
-        return model
+
 
 class ConcatDatasets(torch.utils.data.Dataset):
 	def __init__(self, dataloaders):
@@ -163,8 +160,12 @@ if __name__ == '__main__':
 	checkpoint_callback = ModelCheckpoint(monitor="val_main_tot", save_last=True, 
 										  save_top_k=2, mode='min', period=2
 										  )
-
+	class MyDDP(DDPPlugin):
+		def configure_ddp(self, model, device_ids=opt.device_ids):
+			model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
+			return model
 	my_ddp = MyDDP()
+
 
 	# training
 	trainer = pl.Trainer(checkpoint_callback=True,
