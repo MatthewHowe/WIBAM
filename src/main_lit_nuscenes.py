@@ -47,22 +47,17 @@ class LitWIBAM(pl.LightningModule):
 						optimizer, mode='min', factor=0.1, patience=2,
 						threshold=0.001, verbose=True)
 		return {"optimizer": optimizer, "lr_scheduler": scheduler,
-				"monitor": "val_tot"}
+				"monitor": "val_main_tot"}
 
 	def training_step(self, train_batch, batch_idx):
-		main_out = self(train_batch[0]['image'])[0]
-		mix_out = self(train_batch[1]['image'])[0]
+		main_out = self(train_batch['image'])[0]
 
-		main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
-		mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
+		main_loss, main_loss_stats = self.main_loss(main_out, train_batch)
 		
 		for key, val in main_loss_stats.items():
 			self.log("train_main_{}".format(key), val, on_epoch=True)
-		for key, val in mix_loss_stats.items():
-			self.log("train_mix_{}".format(key), val, on_epoch=True)
-		total_loss = main_loss + mix_loss
-		self.log("train_tot", total_loss, on_epoch=True)
-		return {"loss": total_loss}
+
+		return main_loss
 
 	def training_epoch_end(self, training_step_outputs):
 		format_dict = {}
@@ -75,18 +70,12 @@ class LitWIBAM(pl.LightningModule):
 		self.log("train_variance", variance, on_epoch=True)
 
 	def validation_step(self, val_batch, batch_idx):
-		main_out = self(val_batch[0]['image'])[0]
-		mix_out = self(val_batch[1]['image'])[0]
+		main_out = self(val_batch['image'])[0]
 
-		main_loss, main_loss_stats = self.main_loss(main_out, val_batch[0])
-		mix_loss, mix_loss_stats = self.mix_loss(mix_out, val_batch[1])
+		main_loss, main_loss_stats = self.main_loss(main_out, val_batch)
 
 		for key, val in main_loss_stats.items():
 			self.log("val_main_{}".format(key), val, on_epoch=True)
-		for key, val in mix_loss_stats.items():
-			self.log("val_mix_{}".format(key), val, on_epoch=True)
-		total_val = main_loss + mix_loss
-		self.log("val_tot", total_val, on_epoch=True)
 
 		return main_loss
 
@@ -96,8 +85,6 @@ class LitWIBAM(pl.LightningModule):
 		mean = torch.mean(torch.stack(validation_step_outputs))
 		print("Mean: {}, var: {}".format(mean, variance))
 		self.log("val_variance", variance, on_epoch=True)
-
-	
 
 class ConcatDatasets(torch.utils.data.Dataset):
 	def __init__(self, dataloaders):
@@ -133,24 +120,10 @@ if __name__ == '__main__':
 		num_workers=opt.num_workers, drop_last=True
 	)
 
-	mixed_loader = torch.utils.data.DataLoader(
-		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
-		num_workers=opt.num_workers, drop_last=True
-	)
-
-	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
-
 	val_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'val'), batch_size=opt.batch_size,
 		num_workers=opt.num_workers, drop_last=True
 	)
-
-	val_mixed_loader = torch.utils.data.DataLoader(
-		MixedDataset(opt, 'val'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers, drop_last=True
-	)
-
-	MixedValLoader = ConcatDatasets([val_loader, val_mixed_loader])
 
 	# model
 	model = LitWIBAM()
@@ -170,4 +143,4 @@ if __name__ == '__main__':
 						 check_val_every_n_epoch=1,
 						 )
 	
-	trainer.fit(model, MixedDataloader, MixedValLoader)
+	trainer.fit(model, training_loader, val_loader)

@@ -450,7 +450,7 @@ class WIBAM(GenericDataset):
         file_name = img_info['file_name']
         img_path = os.path.join(img_dir, file_name)
         # if self.opt.show_repro is True:
-        drawing_images.append(cv2.imread(img_path))
+        # drawing_images.append(cv2.imread(img_path))
 
         # Use coco utils to get annotation IDs for image instance
         ann_ids = coco.getAnnIds(imgIds=[ann_img_id])
