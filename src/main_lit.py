@@ -108,10 +108,7 @@ class ConcatDatasets(torch.utils.data.Dataset):
 	def __iter__(self):
 		self.loader_iter = []
 		for data_loader in self.dataloaders:
-			try:
-				self.loader_iter.append(iter(data_loader))
-			except:
-				self.loader_iter.append({images=p})
+			self.loader_iter.append(iter(data_loader))
 		return self
 
 	def __next__(self):
@@ -132,16 +129,11 @@ if __name__ == '__main__':
 	MixedDataset = get_dataset(opt.mixed_dataset)
 	opt = opts().update_dataset_info_and_set_heads(opt, MainDataset)
 
-	print("[INFO] Creating dataloaders\n")
-
 	training_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'train'), batch_size=opt.batch_size,
 		num_workers=opt.num_workers, drop_last=True,
 		shuffle=True
 	)
-
-	print("Main dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		training_loader.dataset, len(training_loader), len(training_loader.dataset)))
 
 	mixed_loader = torch.utils.data.DataLoader(
 		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
@@ -149,33 +141,19 @@ if __name__ == '__main__':
 		shuffle=True
 	)
 
-	print("Mixed dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		mixed_loader.dataset, len(mixed_loader), len(mixed_loader.dataset)))
-
 	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
-
-	print("[INFO] Training dataloaders created\n")
 
 	val_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'val'), batch_size=opt.batch_size,
 		num_workers=opt.num_workers, drop_last=True
 	)
 
-	print("Validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		val_loader.dataset, len(val_loader), len(val_loader.dataset)))
-
 	val_mixed_loader = torch.utils.data.DataLoader(
 		MixedDataset(opt, 'val'), batch_size=opt.batch_size,
 		num_workers=opt.num_workers, drop_last=True
 	)
 
-	print("Mixed validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		val_mixed_loader.dataset, len(val_mixed_loader), len(val_mixed_loader.dataset)))
-
 	MixedValLoader = ConcatDatasets([val_loader, val_mixed_loader])
-
-	print("[INFO] Validation dataloaders created")
-	print("[INFO] Successfully created data loaders")
 
 	# model
 	model = LitWIBAM()
