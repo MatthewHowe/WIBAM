@@ -15,7 +15,7 @@ class BaseModel(nn.Module):
     def __init__(self, heads, head_convs, num_stacks, last_channel, opt=None):
         super(BaseModel, self).__init__()
         if opt is not None and opt.head_kernel != 3:
-          print('Using head kernel:', opt.head_kernel)
+          # print('Using head kernel:', opt.head_kernel)
           head_kernel = opt.head_kernel
         else:
           head_kernel = 3

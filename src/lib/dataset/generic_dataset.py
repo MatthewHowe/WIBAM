@@ -76,8 +76,8 @@ class GenericDataset(data.Dataset):
       self.multi_cam = multi_cam
 
     if ann_path is not None and img_dir is not None:
-      print('==> initializing {} data from {}, \n images from {} ...'.format(
-        split, ann_path, img_dir))
+      # print('==> initializing {} data from {}, \n images from {} ...'.format(
+      #   split, ann_path, img_dir))
       self.coco = coco.COCO(ann_path)
       self.images = self.coco.getImgIds()
 

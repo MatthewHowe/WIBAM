@@ -16,7 +16,9 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
-from pytorch_lightning.plugins import DDPPlugin
+from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
+
+from pytorch_lightning.overrides.data_parallel import LightningDistributedDataParallel
 
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
@@ -116,7 +118,7 @@ class ConcatDatasets(torch.utils.data.Dataset):
 		return tuple(out)
 
 	def __len__(self):
-		length = len(self.dataloaders[0].dataset) + len(self.dataloaders[1].dataset)
+		length = min([len(self.dataloaders[0]),len(self.dataloaders[1])])
 		return length
 
 if __name__ == '__main__':
@@ -129,12 +131,14 @@ if __name__ == '__main__':
 
 	training_loader = torch.utils.data.DataLoader(
 		MainDataset(opt, 'train'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers, drop_last=True
+		num_workers=opt.num_workers, drop_last=True,
+		shuffle=True
 	)
 
 	mixed_loader = torch.utils.data.DataLoader(
 		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
-		num_workers=opt.num_workers, drop_last=True
+		num_workers=opt.num_workers, drop_last=True,
+		shuffle=True
 	)
 
 	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
@@ -160,9 +164,10 @@ if __name__ == '__main__':
 	checkpoint_callback = ModelCheckpoint(monitor="val_main_tot", save_last=True, 
 										  save_top_k=2, mode='min', period=2
 										  )
+										  
 	class MyDDP(DDPPlugin):
-		def configure_ddp(self):
-			model = LightningDistributedDataParallel(self.model, self.determine_ddp_device_ids(), find_unused_parameters=True)
+		def configure_ddp(self, model, device_ids=opt.gpus):
+			model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
 			return model
 	my_ddp = MyDDP()
 

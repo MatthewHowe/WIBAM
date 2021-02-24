@@ -31,7 +31,7 @@ def create_model(arch, head, head_conv, opt=None):
 def load_model(model, model_path, opt, optimizer=None):
   start_epoch = 0
   checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
-  print('loaded {}, epoch {}'.format(model_path, checkpoint['epoch']))
+  # print('loaded {}, epoch {}'.format(model_path, checkpoint['epoch']))
   state_dict_ = checkpoint['state_dict']
   state_dict = {}
    
@@ -49,9 +49,9 @@ def load_model(model, model_path, opt, optimizer=None):
       if (state_dict[k].shape != model_state_dict[k].shape) or \
         (opt.reset_hm and k.startswith('hm') and (state_dict[k].shape[0] in [80, 1])):
         if opt.reuse_hm:
-          print('Reusing parameter {}, required shape{}, '\
-                'loaded shape{}.'.format(
-            k, model_state_dict[k].shape, state_dict[k].shape))
+          # print('Reusing parameter {}, required shape{}, '\
+          #       'loaded shape{}.'.format(
+            # k, model_state_dict[k].shape, state_dict[k].shape))
           if state_dict[k].shape[0] < state_dict[k].shape[0]:
             model_state_dict[k][:state_dict[k].shape[0]] = state_dict[k]
           else:

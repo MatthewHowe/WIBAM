@@ -252,14 +252,14 @@ class DLA(nn.Module):
         #         m.weight.data.fill_(1)
         #         m.bias.data.zero_()
         if opt.pre_img:
-            print('adding pre_img layer...')
+            # print('adding pre_img layer...')
             self.pre_img_layer = nn.Sequential(
             nn.Conv2d(3, channels[0], kernel_size=7, stride=1,
                       padding=3, bias=False),
             nn.BatchNorm2d(channels[0], momentum=BN_MOMENTUM),
             nn.ReLU(inplace=True))
         if opt.pre_hm:
-            print('adding pre_hm layer...')
+            # print('adding pre_hm layer...')
             self.pre_hm_layer = nn.Sequential(
             nn.Conv2d(1, channels[0], kernel_size=7, stride=1,
                     padding=3, bias=False),
@@ -372,8 +372,6 @@ def dla34(pretrained=True, **kwargs):  # DLA-34
     if pretrained:
         model.load_pretrained_model(
             data='imagenet', name='dla34', hash='ba72cf86')
-    else:
-        print('Warning: No ImageNet pretrain!!')
     return model
 
 def dla102(pretrained=None, **kwargs):  # DLA-102

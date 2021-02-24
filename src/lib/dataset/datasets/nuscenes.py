@@ -45,7 +45,7 @@ class nuScenes(GenericDataset):
     data_dir = os.path.join(opt.data_dir, 'nuscenes')
     img_dir = os.path.join(
       data_dir, 'v1.0-mini' if split_name  == 'mini' else 'v1.0-trainval')
-    print('Dataset version', opt.dataset_version)
+    # print('Dataset version', opt.dataset_version)
     if opt.dataset_version == 'test':
       ann_path = os.path.join(data_dir, 
         'annotations', 'test.json')
@@ -60,7 +60,7 @@ class nuScenes(GenericDataset):
     self.alpha_in_degree = False    
     self.num_samples = len(self.images)
 
-    print('Loaded {} {} samples'.format(split, self.num_samples))
+    # print('Loaded {} {} samples'.format(split, self.num_samples))
 
 
   def __len__(self):

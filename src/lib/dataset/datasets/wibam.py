@@ -86,10 +86,10 @@ class WIBAM(GenericDataset):
       self.instance_batching = False
       self.num_samples = len(self.images)
 
-    print('[INFO] Loaded {} split with {} images and {} instances'.format( \
-          split, len(self.images), len(self.instances)))
-    print("[INFO] Loading with instance_batching: {} in {} samples".format( \
-          self.opt.instance_batching, self.num_samples))
+    # print('[INFO] Loaded {} split with {} images and {} instances'.format( \
+    #       split, len(self.images), len(self.instances)))
+    # print("[INFO] Loading with instance_batching: {} in {} samples".format( \
+    #       self.opt.instance_batching, self.num_samples))
 
   # Override functions
   # Called to load image and annotations, option to do all instances at time

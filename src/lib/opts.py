@@ -318,7 +318,7 @@ class opts(object):
         opt.show_track_color = True
 
     opt.fix_res = not opt.keep_res
-    print('Fix size testing.' if opt.fix_res else 'Keep resolution testing.')
+    # print('Fix size testing.' if opt.fix_res else 'Keep resolution testing.')
 
     if opt.head_conv == -1: # init default head_conv
       opt.head_conv = 256 if 'dla' in opt.arch else 64
@@ -335,7 +335,7 @@ class opts(object):
       if i < rest_batch_size % (len(opt.gpus) - 1):
         slave_chunk_size += 1
       opt.chunk_sizes.append(slave_chunk_size)
-    print('training chunk_sizes:', opt.chunk_sizes)
+    # print('training chunk_sizes:', opt.chunk_sizes)
 
     if opt.debug > 0:
       opt.num_workers = 0
@@ -419,10 +419,10 @@ class opts(object):
     opt.head_conv = {head: [opt.head_conv \
       for i in range(opt.num_head_conv if head != 'reg' else 1)] for head in opt.heads}
 
-    print('input h w:', opt.input_h, opt.input_w)
-    print('heads', opt.heads)
-    print('weights', opt.weights)
-    print('head conv', opt.head_conv)
+    # print('input h w:', opt.input_h, opt.input_w)
+    # print('heads', opt.heads)
+    # print('weights', opt.weights)
+    # print('head conv', opt.head_conv)
 
     return opt
 
