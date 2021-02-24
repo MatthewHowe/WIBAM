@@ -44,6 +44,57 @@ class LitWIBAM(pl.LightningModule):
 		output = self.model(x)
 		return output
 
+	def train_dataloader(self):
+		# data
+		MainDataset = get_dataset(self.opt.dataset)
+		MixedDataset = get_dataset(self.opt.mixed_dataset)
+		opt = opts().update_dataset_info_and_set_heads(self.opt, MainDataset)
+
+		training_loader = torch.utils.data.DataLoader(
+			MainDataset(self.opt, 'train'), batch_size=self.opt.batch_size,
+			num_workers=self.opt.num_workers, drop_last=True,
+			shuffle=True
+		)
+
+		print("Main dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
+			training_loader.dataset, len(training_loader), len(training_loader.dataset)))
+
+		mixed_loader = torch.utils.data.DataLoader(
+			MixedDataset(self.opt, 'train'), batch_size=self.opt.mixed_batchsize,
+			num_workers=self.opt.num_workers, drop_last=True,
+			shuffle=True
+		)
+
+		print("Mixed dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
+			mixed_loader.dataset, len(mixed_loader), len(mixed_loader.dataset)))
+
+		MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
+
+		return MixedDataloader
+
+	def val_dataloader(self):
+		MainDataset = get_dataset(self.opt.dataset)
+		MixedDataset = get_dataset(self.opt.mixed_dataset)
+		val_loader = torch.utils.data.DataLoader(
+			MainDataset(self.opt, 'val'), batch_size=self.opt.batch_size,
+			num_workers=self.opt.num_workers, drop_last=True
+		)
+
+		print("Validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
+			val_loader.dataset, len(val_loader), len(val_loader.dataset)))
+
+		val_mixed_loader = torch.utils.data.DataLoader(
+			MixedDataset(self.opt, 'val'), batch_size=self.opt.batch_size,
+			num_workers=self.opt.num_workers, drop_last=True
+		)
+
+		print("Mixed validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
+			val_mixed_loader.dataset, len(val_mixed_loader), len(val_mixed_loader.dataset)))
+
+		MixedValLoader = ConcatDatasets([val_loader, val_mixed_loader])
+
+		return MixedValLoader
+
 	def configure_optimizers(self):
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
 		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -53,6 +104,8 @@ class LitWIBAM(pl.LightningModule):
 				"monitor": "val_tot"}
 
 	def training_step(self, train_batch, batch_idx):
+		# print(len(train_batch[0]['image']))
+		# print(len(train_batch[1]['image']))
 		main_out = self(train_batch[0]['image'])[0]
 		mix_out = self(train_batch[1]['image'])[0]
 
@@ -65,7 +118,7 @@ class LitWIBAM(pl.LightningModule):
 			self.log("train_mix_{}".format(key), val, on_epoch=True)
 		total_loss = main_loss + mix_loss
 		self.log("train_tot", total_loss, on_epoch=True)
-		return {"loss": total_loss}
+		return total_loss
 
 	def training_epoch_end(self, training_step_outputs):
 		format_dict = {}
@@ -90,7 +143,7 @@ class LitWIBAM(pl.LightningModule):
 			self.log("val_mix_{}".format(key), val, on_epoch=True)
 		total_val = main_loss + mix_loss
 		self.log("val_tot", total_val, on_epoch=True)
-
+		print(main_loss)
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
@@ -100,7 +153,7 @@ class LitWIBAM(pl.LightningModule):
 
 
 
-class ConcatDatasets(torch.utils.data.Dataset):
+class ConcatDatasets():
 	def __init__(self, dataloaders):
 		self.dataloaders = dataloaders
 		self.batch_size = self.dataloaders[0].batch_size + self.dataloaders[1].batch_size
@@ -124,56 +177,6 @@ class ConcatDatasets(torch.utils.data.Dataset):
 if __name__ == '__main__':
 	opt = opts().parse()
 
-	# data
-	MainDataset = get_dataset(opt.dataset)
-	MixedDataset = get_dataset(opt.mixed_dataset)
-	opt = opts().update_dataset_info_and_set_heads(opt, MainDataset)
-
-	print("[INFO] Creating dataloaders\n")
-
-	training_loader = torch.utils.data.DataLoader(
-		MainDataset(opt, 'train'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers, drop_last=True,
-		shuffle=True
-	)
-
-	print("Main dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		training_loader.dataset, len(training_loader), len(training_loader.dataset)))
-
-	mixed_loader = torch.utils.data.DataLoader(
-		MixedDataset(opt, 'train'), batch_size=opt.mixed_batchsize,
-		num_workers=opt.num_workers, drop_last=True,
-		shuffle=True
-	)
-
-	print("Mixed dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		mixed_loader.dataset, len(mixed_loader), len(mixed_loader.dataset)))
-
-	MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
-
-	print("[INFO] Training dataloaders created\n")
-
-	val_loader = torch.utils.data.DataLoader(
-		MainDataset(opt, 'val'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers, drop_last=True
-	)
-
-	print("Validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		val_loader.dataset, len(val_loader), len(val_loader.dataset)))
-
-	val_mixed_loader = torch.utils.data.DataLoader(
-		MixedDataset(opt, 'val'), batch_size=opt.batch_size,
-		num_workers=opt.num_workers, drop_last=True
-	)
-
-	print("Mixed validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-		val_mixed_loader.dataset, len(val_mixed_loader), len(val_mixed_loader.dataset)))
-
-	MixedValLoader = ConcatDatasets([val_loader, val_mixed_loader])
-
-	print("[INFO] Validation dataloaders created")
-	print("[INFO] Successfully created data loaders")
-
 	# model
 	model = LitWIBAM()
 	state_dict = torch.load(opt.load_model)
@@ -195,9 +198,9 @@ if __name__ == '__main__':
 	trainer = pl.Trainer(checkpoint_callback=True,
 						 callbacks=[checkpoint_callback],
 						 default_root_dir=opt.output_path, 
-						 gpus=opt.gpus, accelerator="ddp",
+						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=1,
 						 plugins=[my_ddp]
 						 )
 	
-	trainer.fit(model, MixedDataloader, MixedValLoader)
+	trainer.fit(model)

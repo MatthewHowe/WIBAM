@@ -172,7 +172,7 @@ class DLASeg(nn.Module):
         self.opt = opt
         self.channels = channels
         self.node_type = DLA_NODE[opt.dla_node]
-        print('Using node type:', self.node_type)
+        # print('Using node type:', self.node_type)
         down_ratio = 4
         self.first_level = int(np.log2(down_ratio))
         self.last_level = 5
