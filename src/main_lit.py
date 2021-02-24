@@ -108,7 +108,10 @@ class ConcatDatasets(torch.utils.data.Dataset):
 	def __iter__(self):
 		self.loader_iter = []
 		for data_loader in self.dataloaders:
-			self.loader_iter.append(iter(data_loader))
+			try:
+				self.loader_iter.append(iter(data_loader))
+			except:
+				self.loader_iter.append({images=p})
 		return self
 
 	def __next__(self):
