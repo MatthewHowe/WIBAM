@@ -143,7 +143,6 @@ class LitWIBAM(pl.LightningModule):
 			self.log("val_mix_{}".format(key), val, on_epoch=True)
 		total_val = main_loss + mix_loss
 		self.log("val_tot", total_val, on_epoch=True)
-		print(main_loss)
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
