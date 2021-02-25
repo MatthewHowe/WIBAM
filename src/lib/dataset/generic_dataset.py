@@ -9,7 +9,8 @@ import cv2
 import os
 from collections import defaultdict
 
-import pycocotools.coco as coco
+# import pycocotools.coco as coco
+from .datasets.coco_tools import coco
 import torch
 import torch.utils.data as data
 

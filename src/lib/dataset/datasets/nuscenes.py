@@ -5,7 +5,7 @@ from __future__ import print_function
 
 # import pycocotools.coco as coco
 from .coco_tools.coco import COCO as coco
-from pycocotools.cocoeval import COCOeval
+from .coco_tools.cocoeval import COCOeval
 from pyquaternion import Quaternion
 import numpy as np
 import torch
