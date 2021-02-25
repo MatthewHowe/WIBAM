@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import pycocotools.coco as coco
+# import pycocotools.coco as coco
+from .coco_tools.coco import COCO as coco
 import numpy as np
 import torch
 import json

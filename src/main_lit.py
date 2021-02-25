@@ -75,8 +75,14 @@ class LitWIBAM(pl.LightningModule):
 	def val_dataloader(self):
 		MainDataset = get_dataset(self.opt.dataset)
 		MixedDataset = get_dataset(self.opt.mixed_dataset)
+		main = MainDataset(self.opt, 'val')
+		mixed = MixedDataset(self.opt, 'val')
+		
+		batch_size = math.ceil(len(main)/len(mixed))
+		mult = 2 * math.floor(self.opt.batch_size/batch_size)
+
 		val_loader = torch.utils.data.DataLoader(
-			MainDataset(self.opt, 'val'), batch_size=self.opt.batch_size,
+			main, batch_size=batch_size*mult,
 			num_workers=self.opt.num_workers, drop_last=True
 		)
 
@@ -84,7 +90,7 @@ class LitWIBAM(pl.LightningModule):
 			val_loader.dataset, len(val_loader), len(val_loader.dataset)))
 
 		val_mixed_loader = torch.utils.data.DataLoader(
-			MixedDataset(self.opt, 'val'), batch_size=self.opt.batch_size,
+			MixedDataset(self.opt, 'val'), batch_size=mult,
 			num_workers=self.opt.num_workers, drop_last=True
 		)
 
@@ -104,8 +110,6 @@ class LitWIBAM(pl.LightningModule):
 				"monitor": "val_tot"}
 
 	def training_step(self, train_batch, batch_idx):
-		# print(len(train_batch[0]['image']))
-		# print(len(train_batch[1]['image']))
 		main_out = self(train_batch[0]['image'])[0]
 		mix_out = self(train_batch[1]['image'])[0]
 
@@ -150,7 +154,11 @@ class LitWIBAM(pl.LightningModule):
 		mean = torch.mean(torch.stack(validation_step_outputs))
 		self.log("val_variance", variance, on_epoch=True)
 
+	def test_step(self, test_batch,  test_idx):
+		return self.validation_step(test_batch, test_idx)
 
+	def test_epoch_end(self, test_step_outputs):
+		self.validation_epoch_end(test_step_outputs)
 
 class ConcatDatasets():
 	def __init__(self, dataloaders):
@@ -202,4 +210,5 @@ if __name__ == '__main__':
 						 plugins=[my_ddp]
 						 )
 	
+	trainer.test(model, test_dataloaders=model.val_dataloader())
 	trainer.fit(model)
