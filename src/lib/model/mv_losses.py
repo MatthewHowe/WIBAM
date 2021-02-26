@@ -109,8 +109,7 @@ class ReprojectionLoss(nn.Module):
     self.opt = opt
 
   def forward(self, output, batch):
-
-    self.profiler.start()
+    elf.profiler.start()
     detections = {}
     calibrations = {}
     BN = len(batch['cam_num'])

@@ -153,9 +153,9 @@ class opts(object):
                               help="Use only Multiview loss in training")
     self.parser.add_argument('--mixed_learning', action='store_true',
                               help="Whether or not to use multiple trianing datasets")
-    self.parser.add_argument('--mixed_schedule', default=-1,
+    self.parser.add_argument('--mixed_schedule', default=None,
                               help='When to switch datasets, ie 3 on one, 2 on the other (3,2)')
-    self.parser.add_argument('--mixed_dataset', default=-1,
+    self.parser.add_argument('--mixed_dataset', default=None,
                               help='What dataset to mix with')
     self.parser.add_argument('--mixed_batchsize', type=int, default=1,
                               help="Batchsize to load for the mixed dataloader")

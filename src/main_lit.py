@@ -24,7 +24,7 @@ from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
 from utils.collate import default_collate, instance_batching_collate
-from dataset.dataset_factory import get_dataset
+from dataset.dataset_factory import mixed_dataset, get_dataset
 from utils.net import *
 from utils.utils import Profiler
 from trainer import MultiviewLoss, GenericLoss
@@ -45,61 +45,42 @@ class LitWIBAM(pl.LightningModule):
 		return output
 
 	def train_dataloader(self):
-		# data
-		MainDataset = get_dataset(self.opt.dataset)
-		MixedDataset = get_dataset(self.opt.mixed_dataset)
-		opt = opts().update_dataset_info_and_set_heads(self.opt, MainDataset)
+		if self.opt.mixed_dataset is not None:
+			DataLoader = mixed_dataset(
+				self.opt.dataset, self.opt.mixed_dataset,
+				self.opt.batch_size, self.opt.mixed_batchsize,
+				num_workers=self.opt.num_workers,
+				task = "train", opt=self.opt,
+				drop_last=True, shuffle=True
+			)
+		else:
+			DataLoader = torch.utils.data.DataLoader(
+				MainDataset(self.opt, 'train'), 
+				batch_size=self.opt.batch_size,
+				num_workers=self.opt.num_workers, 
+				drop_last=True, shuffle=True
+			)
 
-		training_loader = torch.utils.data.DataLoader(
-			MainDataset(self.opt, 'train'), batch_size=self.opt.batch_size,
-			num_workers=self.opt.num_workers, drop_last=True,
-			shuffle=True
-		)
-
-		print("Main dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-			training_loader.dataset, len(training_loader), len(training_loader.dataset)))
-
-		mixed_loader = torch.utils.data.DataLoader(
-			MixedDataset(self.opt, 'train'), batch_size=self.opt.mixed_batchsize,
-			num_workers=self.opt.num_workers, drop_last=True,
-			shuffle=True
-		)
-
-		print("Mixed dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-			mixed_loader.dataset, len(mixed_loader), len(mixed_loader.dataset)))
-
-		MixedDataloader = ConcatDatasets([training_loader, mixed_loader])
-
-		return MixedDataloader
+		return Dataloader
 
 	def val_dataloader(self):
-		MainDataset = get_dataset(self.opt.dataset)
-		MixedDataset = get_dataset(self.opt.mixed_dataset)
-		main = MainDataset(self.opt, 'val')
-		mixed = MixedDataset(self.opt, 'val')
-		
-		batch_size = math.ceil(len(main)/len(mixed))
-		mult = 2 * math.floor(self.opt.batch_size/batch_size)
+		if self.opt.mixed_dataset is not None:
+			DataLoader = mixed_dataset(
+				self.opt.dataset, self.opt.mixed_dataset,
+				self.opt.batch_size, self.opt.mixed_batchsize,
+				num_workers=self.opt.num_workers,
+				task = "val", opt=self.opt,
+				drop_last=True, shuffle=True
+			)
+		else:
+			DataLoader = torch.utils.data.DataLoader(
+				MainDataset(self.opt, 'val'), 
+				batch_size=self.opt.batch_size,
+				num_workers=self.opt.num_workers, 
+				drop_last=True, shuffle=True
+			)
 
-		val_loader = torch.utils.data.DataLoader(
-			main, batch_size=batch_size*mult,
-			num_workers=self.opt.num_workers, drop_last=True
-		)
-
-		print("Validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-			val_loader.dataset, len(val_loader), len(val_loader.dataset)))
-
-		val_mixed_loader = torch.utils.data.DataLoader(
-			MixedDataset(self.opt, 'val'), batch_size=mult,
-			num_workers=self.opt.num_workers, drop_last=True
-		)
-
-		print("Mixed validation dataloader:\n {}\nIterations: {}\nSamples: {}\n".format(
-			val_mixed_loader.dataset, len(val_mixed_loader), len(val_mixed_loader.dataset)))
-
-		MixedValLoader = ConcatDatasets([val_loader, val_mixed_loader])
-
-		return MixedValLoader
+		return DataLoader
 
 	def configure_optimizers(self):
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
@@ -116,12 +97,12 @@ class LitWIBAM(pl.LightningModule):
 		main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
 		mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
 		
-		for key, val in main_loss_stats.items():
-			self.log("train_main_{}".format(key), val, on_epoch=True)
-		for key, val in mix_loss_stats.items():
-			self.log("train_mix_{}".format(key), val, on_epoch=True)
+		self.log_dict(main_loss_stats)
+		self.log_dict(mix_loss_stats)
+
 		total_loss = main_loss + mix_loss
 		self.log("train_tot", total_loss, on_epoch=True)
+		
 		return total_loss
 
 	def training_epoch_end(self, training_step_outputs):
@@ -141,12 +122,12 @@ class LitWIBAM(pl.LightningModule):
 		main_loss, main_loss_stats = self.main_loss(main_out, val_batch[0])
 		mix_loss, mix_loss_stats = self.mix_loss(mix_out, val_batch[1])
 
-		for key, val in main_loss_stats.items():
-			self.log("val_main_{}".format(key), val, on_epoch=True)
-		for key, val in mix_loss_stats.items():
-			self.log("val_mix_{}".format(key), val, on_epoch=True)
+		self.log_dict(main_loss_stats)
+		self.log_dict(mix_loss_stats)
+
 		total_val = main_loss + mix_loss
 		self.log("val_tot", total_val, on_epoch=True)
+
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
@@ -159,27 +140,6 @@ class LitWIBAM(pl.LightningModule):
 
 	def test_epoch_end(self, test_step_outputs):
 		self.validation_epoch_end(test_step_outputs)
-
-class ConcatDatasets():
-	def __init__(self, dataloaders):
-		self.dataloaders = dataloaders
-		self.batch_size = self.dataloaders[0].batch_size + self.dataloaders[1].batch_size
-
-	def __iter__(self):
-		self.loader_iter = []
-		for data_loader in self.dataloaders:
-			self.loader_iter.append(iter(data_loader))
-		return self
-
-	def __next__(self):
-		out = []
-		for data_iter in self.loader_iter:
-			out.append(next(data_iter))
-		return tuple(out)
-
-	def __len__(self):
-		length = min([len(self.dataloaders[0]),len(self.dataloaders[1])])
-		return length
 
 if __name__ == '__main__':
 	opt = opts().parse()
