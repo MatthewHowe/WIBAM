@@ -148,6 +148,7 @@ class LitWIBAM(pl.LightningModule):
 			main_loss, main_loss_stats = self.main_loss(main_out, val_batch)
 			main_loss_stats = {'val_main_'+str(key): val for key, val in main_loss_stats.items()}
 			self.log_dict(main_loss_stats, on_epoch=True)
+			self.log("val_tot", main_loss, on_epoch=True)
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
