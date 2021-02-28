@@ -102,8 +102,8 @@ class LitWIBAM(pl.LightningModule):
 
 			main_loss_stats = {'train_main_'+str(key): val for key, val in main_loss_stats.items()}
 			mix_loss_stats = {'train_mix_'+str(key): val for key, val in mix_loss_stats.items()}
-			self.log_dict(main_loss_stats)
-			self.log_dict(mix_loss_stats)
+			self.log_dict(main_loss_stats, on_epoch=True)
+			self.log_dict(mix_loss_stats, on_epoch=True)
 
 			total_loss = main_loss + mix_loss
 			self.log("train_tot", total_loss, on_epoch=True)
@@ -113,7 +113,7 @@ class LitWIBAM(pl.LightningModule):
 			main_loss, main_loss_stats = self.main_loss(main_out, train_batch)
 
 			main_loss_stats = {'train_main_'+str(key): val for key, val in main_loss_stats.items()}
-			self.log_dict(main_loss_stats)
+			self.log_dict(main_loss_stats, on_epoch=True)
 			total_loss = main_loss
 
 		return total_loss
@@ -162,12 +162,14 @@ class LitWIBAM(pl.LightningModule):
 	def test_step(self, test_batch,  test_idx):
 		if self.opt.test:
 			out = self(test_batch['image'])[0]
+			for key, val in out.items():
+				out[key] = val.cpu()
 			out = generic_decode(out, self.opt.K, self.opt)
 			# test_batch['meta'] = separate_batches(test_batch['meta'], 
 			# 									  opt.batch_size)
 			out = generic_post_process(self.opt, out, 
-				test_batch['meta']['c'], test_batch['meta']['s'],
-				96,320,10, test_batch['meta']['calib'])
+				test_batch['meta']['c'].cpu(), test_batch['meta']['s'].cpu(),
+				96,320,10, test_batch['meta']['calib'].cpu())
 			for i in range(opt.batch_size):
 				meta = test_batch['meta']
 				out[i] = generic_post_process(self.opt, out, 
