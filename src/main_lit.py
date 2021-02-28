@@ -26,14 +26,14 @@ from model.model import create_model, load_model, save_model
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import mixed_dataset, get_dataset
 from utils.net import *
-from utils.utils import Profiler
+from utils.utils import Profiler, separate_batches
 from trainer import MultiviewLoss, GenericLoss
 
 class LitWIBAM(pl.LightningModule):
 	def __init__(self):
 		super().__init__()
 		opt = opts().parse()
-		Dataset = get_dataset(opt.dataset)
+		Dataset = get_dataset("nuscenes")
 		opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
 		self.opt = opt
 		self.main_loss = GenericLoss(opt)
@@ -55,7 +55,7 @@ class LitWIBAM(pl.LightningModule):
 			)
 		else:
 			DataLoader = torch.utils.data.DataLoader(
-				MainDataset(self.opt, 'train'), 
+				get_dataset(self.opt.dataset)(self.opt, 'train'), 
 				batch_size=self.opt.batch_size,
 				num_workers=self.opt.num_workers, 
 				drop_last=True, shuffle=True
@@ -70,14 +70,14 @@ class LitWIBAM(pl.LightningModule):
 				self.opt.batch_size, self.opt.mixed_batchsize,
 				num_workers=self.opt.num_workers,
 				task = "val", opt=self.opt,
-				drop_last=True, shuffle=True
+				drop_last=True, shuffle=False
 			)
 		else:
 			DataLoader = torch.utils.data.DataLoader(
-				MainDataset(self.opt, 'val'), 
-				batch_size=self.opt.batch_size,
+				get_dataset(self.opt.dataset)(self.opt, 'val'), 
+				batch_size=self.opt.batch_size * 2,
 				num_workers=self.opt.num_workers, 
-				drop_last=True, shuffle=True
+				drop_last=True, shuffle=False
 			)
 
 		return DataLoader
@@ -91,18 +91,25 @@ class LitWIBAM(pl.LightningModule):
 				"monitor": "val_tot"}
 
 	def training_step(self, train_batch, batch_idx):
-		main_out = self(train_batch[0]['image'])[0]
-		mix_out = self(train_batch[1]['image'])[0]
+		if self.opt.mixed_dataset is not None:
+			main_out = self(train_batch[0]['image'])[0]
+			mix_out = self(train_batch[1]['image'])[0]
 
-		main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
-		mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
-		
-		self.log_dict(main_loss_stats)
-		self.log_dict(mix_loss_stats)
+			main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
+			mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
+			
+			self.log_dict(main_loss_stats)
+			self.log_dict(mix_loss_stats)
 
-		total_loss = main_loss + mix_loss
-		self.log("train_tot", total_loss, on_epoch=True)
-		
+			total_loss = main_loss + mix_loss
+			self.log("train_tot", total_loss, on_epoch=True)
+
+		else:
+			main_out = self(train_batch['image'])[0]
+			main_loss, main_loss_stats = self.main_loss(main_out, train_batch)
+			self.log_dict(main_loss_stats)
+			total_loss = main_loss
+
 		return total_loss
 
 	def training_epoch_end(self, training_step_outputs):
@@ -116,18 +123,22 @@ class LitWIBAM(pl.LightningModule):
 		self.log("train_variance", variance, on_epoch=True)
 
 	def validation_step(self, val_batch, batch_idx):
-		main_out = self(val_batch[0]['image'])[0]
-		mix_out = self(val_batch[1]['image'])[0]
+		if self.opt.mixed_dataset is not None:
+			main_out = self(val_batch[0]['image'])[0]
+			mix_out = self(val_batch[1]['image'])[0]
 
-		main_loss, main_loss_stats = self.main_loss(main_out, val_batch[0])
-		mix_loss, mix_loss_stats = self.mix_loss(mix_out, val_batch[1])
+			main_loss, main_loss_stats = self.main_loss(main_out, val_batch[0])
+			mix_loss, mix_loss_stats = self.mix_loss(mix_out, val_batch[1])
 
-		self.log_dict(main_loss_stats)
-		self.log_dict(mix_loss_stats)
+			self.log_dict(main_loss_stats)
+			self.log_dict(mix_loss_stats)
 
-		total_val = main_loss + mix_loss
-		self.log("val_tot", total_val, on_epoch=True)
-
+			total_val = main_loss + mix_loss
+			self.log("val_tot", total_val, on_epoch=True)
+		else:
+			main_out = self(val_batch['image'])[0]
+			main_loss, main_loss_stats = self.main_loss(main_out, val_batch)
+			self.log_dict(main_loss_stats)
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
@@ -135,8 +146,21 @@ class LitWIBAM(pl.LightningModule):
 		mean = torch.mean(torch.stack(validation_step_outputs))
 		self.log("val_variance", variance, on_epoch=True)
 
+	def on_test_epoch_start(self):
+		if self.opt.test:
+			self.results = {}
+
 	def test_step(self, test_batch,  test_idx):
-		return self.validation_step(test_batch, test_idx)
+		if self.opt.test:
+			out = self(test_batch['image'])[0]
+			out = separate_batches(out, test_batch['image'].shape[0])
+			self.test_dataloader.dataloader.dataset.save_mini_result(
+				out, test_batch
+			)
+			for i in range(len(out)):
+				 self.results[test_batch['image_id'][i]] = out[i]
+		else:
+			return self.validation_step(test_batch, test_idx)
 
 	def test_epoch_end(self, test_step_outputs):
 		self.validation_epoch_end(test_step_outputs)

@@ -49,12 +49,12 @@ class Profiler:
     def print_interval_times(self):
         sum = 0.
         for name, time in self.interval_times.items():
-            if name is not "total_time":
+            if name != "total_time":
                 sum += time.avg
 
         string = "\nTotal time: {:.2f}s\n".format(self.interval_times["total_time"].avg)
         for name, time in self.interval_times.items():
-            if name is "total_time":
+            if name == "total_time":
                 continue
             string += "{}: {:.6f}s ({:.2f}%)\n".format(name, time.avg, 100 * time.avg / sum)
 
@@ -66,3 +66,13 @@ class Profiler:
 
     def pause(self):
         self.interval_times["total_time"].update(time.time() - self.start_time)
+
+def separate_batches(output, batch_size):
+    ret = []
+    for batch in range(batch_size):
+        ret.append({})
+    for key, val in output.items():
+        for batch in range(batch_size):
+            ret[batch][key] = val[batch].to('cpu')
+
+    return ret

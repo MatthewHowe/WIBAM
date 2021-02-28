@@ -97,6 +97,8 @@ class GenericDataset(data.Dataset):
     opt = self.opt
     img, anns, img_info, img_path = self._load_data(index)
 
+
+
     height, width = img.shape[0], img.shape[1]
     center = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
     scale = max(img.shape[0], img.shape[1]) * 1.0 if not self.opt.not_max_crop \
@@ -121,6 +123,7 @@ class GenericDataset(data.Dataset):
     # Resize and re colour image for data augmentation
     inp = self._get_input(img, trans_input)
     ret = {'image': inp}
+    ret['image_id'] = img_info['file_name'].split(".")[0]
     gt_det = {'bboxes': [], 'scores': [], 'clses': [], 'cts': []}
 
     # Tracking parameters
