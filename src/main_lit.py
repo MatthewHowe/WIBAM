@@ -61,7 +61,7 @@ class LitWIBAM(pl.LightningModule):
 				drop_last=True, shuffle=True
 			)
 
-		return Dataloader
+		return DataLoader
 
 	def val_dataloader(self):
 		if self.opt.mixed_dataset is not None:
