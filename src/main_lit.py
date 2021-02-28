@@ -23,6 +23,7 @@ from pytorch_lightning.overrides.data_parallel import LightningDistributedDataPa
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
+from model.decode import generic_decode
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import mixed_dataset, get_dataset
 from utils.net import *
@@ -97,7 +98,9 @@ class LitWIBAM(pl.LightningModule):
 
 			main_loss, main_loss_stats = self.main_loss(main_out, train_batch[0])
 			mix_loss, mix_loss_stats = self.mix_loss(mix_out, train_batch[1])
-			
+
+			main_loss_stats = {'train_main_'+str(key): val for key, val in main_loss_stats.items()}
+			mix_loss_stats = {'train_mix_'+str(key): val for key, val in mix_loss_stats.items()}
 			self.log_dict(main_loss_stats)
 			self.log_dict(mix_loss_stats)
 
@@ -107,6 +110,8 @@ class LitWIBAM(pl.LightningModule):
 		else:
 			main_out = self(train_batch['image'])[0]
 			main_loss, main_loss_stats = self.main_loss(main_out, train_batch)
+
+			main_loss_stats = {'train_main_'+str(key): val for key, val in main_loss_stats.items()}
 			self.log_dict(main_loss_stats)
 			total_loss = main_loss
 
@@ -129,7 +134,9 @@ class LitWIBAM(pl.LightningModule):
 
 			main_loss, main_loss_stats = self.main_loss(main_out, val_batch[0])
 			mix_loss, mix_loss_stats = self.mix_loss(mix_out, val_batch[1])
-
+			
+			main_loss_stats = {'val_main_'+str(key): val for key, val in main_loss_stats.items()}
+			mix_loss_stats = {'val_mix_'+str(key): val for key, val in mix_loss_stats.items()}
 			self.log_dict(main_loss_stats)
 			self.log_dict(mix_loss_stats)
 
@@ -138,6 +145,7 @@ class LitWIBAM(pl.LightningModule):
 		else:
 			main_out = self(val_batch['image'])[0]
 			main_loss, main_loss_stats = self.main_loss(main_out, val_batch)
+			main_loss_stats = {'val_main_'+str(key): val for key, val in main_loss_stats.items()}
 			self.log_dict(main_loss_stats)
 		return main_loss
 
@@ -153,12 +161,19 @@ class LitWIBAM(pl.LightningModule):
 	def test_step(self, test_batch,  test_idx):
 		if self.opt.test:
 			out = self(test_batch['image'])[0]
+			out = generic_decode(out, self.opt.K, self.opt)
+			out = generic_post_process(self.opt, out, 
+					np.array([621,187.5]), 1242, 96, 320, 10)
 			out = separate_batches(out, test_batch['image'].shape[0])
-			self.test_dataloader.dataloader.dataset.save_mini_result(
-				out, test_batch
-			)
+			# self.test_dataloader.dataloader.dataset.save_mini_result(
+			# 	out, test_batch
+			# )
+			save_res = []
 			for i in range(len(out)):
-				 self.results[test_batch['image_id'][i]] = out[i]
+				self.results[test_batch['image_id'][i]] = out[i]
+			self.test_dataloader.dataloader.dataset.save_mini_result(
+				self.results
+			)
 		else:
 			return self.validation_step(test_batch, test_idx)
 
@@ -168,9 +183,10 @@ class LitWIBAM(pl.LightningModule):
 if __name__ == '__main__':
 
 	opt = opts().parse()
-	gclout = fsspec.filesystem(opt.output_path.split(":", 1)[0])
-	print(gclout.isdir(opt.output_path))
-	print(gclout.isdir(opt.output_path))
+	if opt.output_path is not None:
+		gclout = fsspec.filesystem(opt.output_path.split(":", 1)[0])
+		print(gclout.isdir(opt.output_path))
+		print(gclout.isdir(opt.output_path))
 	# model
 	model = LitWIBAM()
 	state_dict = torch.load(opt.load_model)

@@ -6,6 +6,7 @@ import pycocotools.coco as coco
 import numpy as np
 import torch
 import json
+from pathlib import Path
 import cv2
 import os
 import math
@@ -87,14 +88,16 @@ class KITTI(GenericDataset):
         f.write(' {:.2f} {:.2f}\n'.format(item['rot_y'], item['score']))
       f.close()
 
-  def save_mini_result(self, results, save_dir):
+  def save_mini_result(self, results):
+    root_dir = Path('/home/matthew/Documents/phd_projects/WIBAM/')
+    save_dir = os.path.join(root_dir, 'exp/test')
     results_dir = os.path.join(save_dir, 'results_kitti')
     if not os.path.exists(results_dir):
       os.mkdir(results_dir)
     for img_id in results.keys():
-      out_path = os.path.join(results_dir, '{:06d}.txt'.format(img_id))
+      out_path = os.path.join(results_dir, '{}.txt'.format(img_id))
       f = open(out_path, 'w')
-      for i in range(len(results[img_id])):
+      for key, item in results[img_id].items():
         item = results[img_id][i]
         category_id = item['class']
         cls_name_ind = category_id
