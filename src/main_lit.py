@@ -6,7 +6,7 @@ import _init_paths
 import os
 import math
 from pathlib import Path
-
+import fsspec
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -166,8 +166,11 @@ class LitWIBAM(pl.LightningModule):
 		self.validation_epoch_end(test_step_outputs)
 
 if __name__ == '__main__':
-	opt = opts().parse()
 
+	opt = opts().parse()
+	gclout = fsspec.filesystem(opt.output_path.split(":", 1)[0])
+	print(gclout.isdir(opt.output_path))
+	print(gclout.isdir(opt.output_path))
 	# model
 	model = LitWIBAM()
 	state_dict = torch.load(opt.load_model)
