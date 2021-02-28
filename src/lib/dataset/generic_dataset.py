@@ -68,6 +68,7 @@ class GenericDataset(data.Dataset):
     4: [2, 3, 4], 5: [5, 6, 7], 6: [5, 6, 7], 7: [5, 6, 7]}
   def __init__(self, opt=None, split=None, ann_path=None, img_dir=None, multi_cam=None):
     super(GenericDataset, self).__init__()
+    self.meta = {}
     if opt is not None and split is not None:
       self.split = split
       self.opt = opt
@@ -174,11 +175,9 @@ class GenericDataset(data.Dataset):
         ret, gt_det, k, cls_id, bbox, bbox_amodal, ann, trans_output, aug_s, 
         calib, pre_cts, track_ids)
 
-    if self.opt.debug > 0:
+    if self.opt.test is True:
       gt_det = self._format_gt_det(gt_det)
-      meta = {'c': center, 's': scale, 'gt_det': gt_det, 'img_id': img_info['id'],
-              'img_path': img_path, 'calib': calib,
-              'flipped': flipped}
+      meta = {'c': center, 's': scale, 'calib': calib}
       ret['meta'] = meta
     return ret
 

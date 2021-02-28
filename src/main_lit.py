@@ -24,6 +24,7 @@ from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
 from model.decode import generic_decode
+from utils.post_process import generic_post_process
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import mixed_dataset, get_dataset
 from utils.net import *
@@ -137,8 +138,8 @@ class LitWIBAM(pl.LightningModule):
 			
 			main_loss_stats = {'val_main_'+str(key): val for key, val in main_loss_stats.items()}
 			mix_loss_stats = {'val_mix_'+str(key): val for key, val in mix_loss_stats.items()}
-			self.log_dict(main_loss_stats)
-			self.log_dict(mix_loss_stats)
+			self.log_dict(main_loss_stats, on_epoch=True)
+			self.log_dict(mix_loss_stats, on_epoch=True)
 
 			total_val = main_loss + mix_loss
 			self.log("val_tot", total_val, on_epoch=True)
@@ -146,7 +147,7 @@ class LitWIBAM(pl.LightningModule):
 			main_out = self(val_batch['image'])[0]
 			main_loss, main_loss_stats = self.main_loss(main_out, val_batch)
 			main_loss_stats = {'val_main_'+str(key): val for key, val in main_loss_stats.items()}
-			self.log_dict(main_loss_stats)
+			self.log_dict(main_loss_stats, on_epoch=True)
 		return main_loss
 
 	def validation_epoch_end(self, validation_step_outputs):
@@ -162,8 +163,16 @@ class LitWIBAM(pl.LightningModule):
 		if self.opt.test:
 			out = self(test_batch['image'])[0]
 			out = generic_decode(out, self.opt.K, self.opt)
+			# test_batch['meta'] = separate_batches(test_batch['meta'], 
+			# 									  opt.batch_size)
 			out = generic_post_process(self.opt, out, 
-					np.array([621,187.5]), 1242, 96, 320, 10)
+				test_batch['meta']['c'], test_batch['meta']['s'],
+				96,320,10, test_batch['meta']['calib'])
+			for i in range(opt.batch_size):
+				meta = test_batch['meta']
+				out[i] = generic_post_process(self.opt, out, 
+					test_batch['meta']['c'][i], test_batch['meta']['s'][i],
+					96, 320, 10, test_batch['meta']['calib'][i])
 			out = separate_batches(out, test_batch['image'].shape[0])
 			# self.test_dataloader.dataloader.dataset.save_mini_result(
 			# 	out, test_batch

@@ -41,6 +41,7 @@ class KITTI(GenericDataset):
     super(KITTI, self).__init__(opt, split, ann_path, img_dir)
     self.alpha_in_degree = False
     self.num_samples = len(self.images)
+    self.meta = {}
 
     print('Loaded {} {} samples'.format(split, self.num_samples))
 
