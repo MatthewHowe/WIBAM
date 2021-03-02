@@ -15,16 +15,20 @@ from ..generic_dataset import GenericDataset
 from utils.ddd_utils import compute_box_3d, project_to_image
 
 class KITTI(GenericDataset):
-  num_categories = 10
+  
   default_resolution = [384, 1280]
+
   # ['Pedestrian', 'Car', 'Cyclist', 'Van', 'Truck',  'Person_sitting',
   #       'Tram', 'Misc', 'DontCare']
+
+  # num_categories = 3
   # class_name = ['Pedestrian', 'Car', 'Cyclist']
   # # negative id is for "not as negative sample for abs(id)".
   # # 0 for ignore losses for all categories in the bounding box region
   # cat_ids = {1:1, 2:2, 3:3, 4:-2, 5:-2, 6:-1, 7:-9999, 8:-9999, 9:0}
-  max_objs = 50
+  # max_objs = 50
 
+  num_categories = 10
   class_name = [
     'Car', 'truck', 'bus', 'trailer', 
     'construction_vehicle', 'Pedestrian', 'motorcycle', 'Cyclist',

@@ -134,7 +134,7 @@ class MultiviewLoss(torch.nn.Module):
       losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
     
     
-    output = outputs
+    output = outputs[0]
     output = self._sigmoid_output(output)
 
     if not self.opt.mv_only:
@@ -260,7 +260,8 @@ class Trainer(object):
 
       # Put batches to GPU
       for k in batch:
-        if k != 'meta' and k != 'calib' and k != 'drawing_images':
+        if k != 'meta' and k != 'calib' and k != 'drawing_images'\
+            and k != 'image_id':
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
 
       self.profiler.interval_trigger("Data to GPU")

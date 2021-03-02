@@ -111,10 +111,10 @@ def prefetch_test(opt):
     
     Bar.suffix = '[{0}/{1}]|Tot: {total:} |ETA: {eta:} '.format(
                    ind, num_iters, total=bar.elapsed_td, eta=bar.eta_td)
-    for t in avg_time_stats:
-      avg_time_stats[t].update(ret[t])
-      Bar.suffix = Bar.suffix + '|{} {tm.val:.3f}s ({tm.avg:.3f}s) '.format(
-        t, tm = avg_time_stats[t])
+    # for t in avg_time_stats:
+    #   avg_time_stats[t].update(ret[t])
+    #   Bar.suffix = Bar.suffix + '|{} {tm.val:.3f}s ({tm.avg:.3f}s) '.format(
+    #     t, tm = avg_time_stats[t])
     if opt.print_iter > 0:
       if ind % opt.print_iter == 0:
         print('{}/{}| {}'.format(opt.task, opt.exp_id, Bar.suffix))
@@ -167,9 +167,9 @@ def test(opt):
 
     Bar.suffix = '[{0}/{1}]|Tot: {total:} |ETA: {eta:} '.format(
                    ind, num_iters, total=bar.elapsed_td, eta=bar.eta_td)
-    for t in avg_time_stats:
-      avg_time_stats[t].update(ret[t])
-      Bar.suffix = Bar.suffix + '|{} {:.3f} '.format(t, avg_time_stats[t].avg)
+    # for t in avg_time_stats:
+    #   avg_time_stats[t].update(ret[t])
+    #   Bar.suffix = Bar.suffix + '|{} {:.3f} '.format(t, avg_time_stats[t].avg)
     bar.next()
   bar.finish()
   if opt.save_results:

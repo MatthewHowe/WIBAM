@@ -444,7 +444,7 @@ void cleanData(CLASSES current_class, const vector<tGroundtruth> &gt, const vect
     int32_t height = fabs(det[i].box.y1 - det[i].box.y2);
     // set ignored vector for detections
     if(height<MIN_HEIGHT[difficulty])
-      ignored_det.push_back(1);
+      ignored_det.push_back(1);0.5
     else if(valid_class==1)
       ignored_det.push_back(0);
     else

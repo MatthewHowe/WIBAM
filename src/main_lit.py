@@ -201,9 +201,15 @@ if __name__ == '__main__':
 		print(gclout.isdir(opt.output_path))
 	# model
 	model = LitWIBAM()
-	state_dict = torch.load(opt.load_model)
-	state_dict['state_dict'] = {'model.' + str(key): val for key, val in state_dict['state_dict'].items()}
-	model.load_state_dict(state_dict['state_dict'])
+	state_dict_ = torch.load(opt.load_model)['state_dict']
+	state_dict = {}
+	for k in state_dict_:
+		if k.startswith('module') and not k.startswith('module_list'):
+			state_dict[k[7:]] = state_dict_[k]
+		else:
+			state_dict[k] = state_dict_[k]
+	state_dict = {'model.' + str(key): val for key, val in state_dict.items()}
+	model.load_state_dict(state_dict)
 
 	checkpoint_callback = ModelCheckpoint(monitor="val_main_tot", save_last=True, 
 										  save_top_k=2, mode='min', period=2
