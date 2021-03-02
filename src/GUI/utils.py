@@ -1,4 +1,56 @@
-import 
+import numpy as np
+import cv2
+import math
+
+def det_3D_to_BBox_3D(detections, calib):
+  r"""
+  Convert 3D detection to list of 8 x 3D points for bounding boxes
+  Arguments:
+    dets (np.array, float32): list of detections with format location on ground plane,
+      size of object, and rotation +ve is anti-clockwise (right 
+      hand rule around z-axis positive up)
+      format: [[loc[x,y,0], size[l,w,h], rot[deg]], ...]
+  Returns:
+    BB3D (np.array, float32): list of 3D bounding boxes in order bottom to top, front to back, 
+      right to left
+      format: [[btm_fr,btm_fl,btm_rr,btm_rl,top_fr, ...], ...]
+  """
+  objs = len(detections)
+  bounding_box_3D = np.zeros((objs, 8, 3))
+
+  for i in range(len(detections)):
+    obj = detections[i]
+    l = obj['l']
+    w = obj['w']
+    h = obj['h']
+    x = obj['x']
+    y = obj['y']
+    z = obj['z']
+    rot = obj['rot']
+    
+    x_corners = np.array([ l/2,  l/2, -l/2, -l/2,  l/2, l/2, -l/2, -l/2])
+    y_corners = np.array([-w/2,  w/2,  w/2, -w/2, -w/2, w/2,  w/2, -w/2])
+    z_corners = np.array([0, 0, 0, 0,  h, h,  h,  h])
+    points = np.stack((x_corners, y_corners, z_corners), 1)
+
+    rotation_object = rot * math.pi/180
+    c, s = math.cos(rotation_object), math.sin(rotation_object)
+    rotation_matrix = np.zeros((3, 3))
+    rotation_matrix[0, 0] = c
+    rotation_matrix[0, 1] = -s
+    rotation_matrix[1, 0] = s
+    rotation_matrix[1, 1] = c
+    rotation_matrix[2, 2] = 1
+
+    points = np.transpose(points)
+    points = np.matmul(rotation_matrix, points)
+    location = np.array([[x],[y],[z]])
+    points = np.add(location, points)
+    points = np.transpose(points)
+
+    bounding_box_3D[i] = points
+
+  return bounding_box_3D
 
 def dets_3D_wcf_to_dets_2D(detections, calib):
   r"""
@@ -14,48 +66,134 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
       dets_2D (np.array, float): Detections in 3D on the given camera calibration
           format: 
   """
-  BN, objs, dims = detections['location_wcf'].shape
-  num_cams = calib['P'].shape[1]
-  detections_2D = torch.zeros((BN, num_cams, objs, 4))
-  detections_projected3Dbb = torch.zeros((BN, num_cams, objs, 8, 2))
+  objs = len(detections)
+  num_cams = len(calib)
+  detections_2D = np.zeros((num_cams, objs, 4))
+  detections_projected3Dbb = np.zeros((num_cams, objs, 8, 2))
   
   # Convert 3D detections to 3D bounding boxes
-  det_3D_to_BBox_3D(detections, calib)
+  detections_3Dbb = det_3D_to_BBox_3D(detections, calib)
 
-  for batch in range(BN):
-    for cam in range(num_cams):
-      P = calib['P'][batch][cam]
-      rvec = calib['rvec'][batch][cam]
-      R_wc = cv2.Rodrigues(rvec.cpu().numpy())[0]
-      R_wc = torch.Tensor(R_wc).to(device="cuda")
-      tvec = calib['tvec'][batch][cam]
+  for cam in range(num_cams):
+    cam_calib = calib[cam]
+    P = cam_calib['camera_matrix']
+    rvec = cam_calib['rvec']
+    R_wc = cv2.Rodrigues(rvec)[0]
+    tvec = cam_calib['tvec']
 
-      bounding_box_wcf = detections['3D_bounding_boxes'][batch]
-      bounding_box_wcf = bounding_box_wcf.transpose(-2,-1)
-      bounding_box_ccf = torch.matmul(R_wc, bounding_box_wcf)
-      bounding_box_ccf = torch.add(bounding_box_ccf, tvec)
+    for obj in range(len(detections_3Dbb)):
+      box = detections_3Dbb[obj]
+      bounding_box_ccf = box.transpose()
+      bounding_box_ccf = np.matmul(R_wc, bounding_box_ccf)
+      bounding_box_ccf = np.add(bounding_box_ccf, tvec)
 
-      bounding_box_cam = torch.matmul(P, bounding_box_ccf)
+      bounding_box_cam = np.matmul(P, bounding_box_ccf)
+      divide = bounding_box_cam[2,:]
+      bounding_box_cam = np.divide(
+        bounding_box_cam[:],
+        bounding_box_cam[2,:]
+      )
 
-      bounding_box_cam = torch.div(bounding_box_cam[:],
-                                   bounding_box_cam[:,2][:,None,:])
+      bounding_box_cam = bounding_box_cam[:2,:].transpose()
 
-      bounding_box_cam = bounding_box_cam[:,:2].transpose(-2,-1)
+      detections_projected3Dbb[cam,obj] = bounding_box_cam
 
-      detections_projected3Dbb[batch][cam] = bounding_box_cam
+    # detections_2D[batch,cam,:,0] = min_bb[:,0]
+    # detections_2D[batch,cam,:,1] = min_bb[:,1]
+    # detections_2D[batch,cam,:,2] = max_bb[:,0]-min_bb[:,0]
+    # detections_2D[batch,cam,:,3] = max_bb[:,1]-min_bb[:,1]
 
-      # Find the minimum rectangle fit around the 3D bounding box
-      min_bb = torch.min(bounding_box_cam, axis=1)[0]
-      max_bb = torch.max(bounding_box_cam, axis=1)[0]
+  # detections['proj_3D_boxes'] = detections_projected3Dbb
+  # detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
 
-      # Append result to list
-      # TODO: Problem with autograd at this point creating new tensor
-      detections_2D[batch,cam,:,0] = min_bb[:,0]
-      detections_2D[batch,cam,:,1] = min_bb[:,1]
-      detections_2D[batch,cam,:,2] = max_bb[:,0]-min_bb[:,0]
-      detections_2D[batch,cam,:,3] = max_bb[:,1]-min_bb[:,1]
+  return detections_projected3Dbb, detections_3Dbb
 
-  detections['proj_3D_boxes'] = detections_projected3Dbb
-  detections['2D_bounding_boxes'] = detections_2D.to(device='cuda')
+def comput_corners_3d(dim, rotation_y):
+  # dim: 3
+  # location: 3
+  # rotation_y: 1
+  # return: 8 x 3
+  c, s = np.cos(rotation_y), np.sin(rotation_y)
+  R = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], dtype=np.float32)
+  l, w, h = dim[2], dim[1], dim[0]
+  x_corners = [l/2, l/2, -l/2, -l/2, l/2, l/2, -l/2, -l/2]
+  y_corners = [0,0,0,0,-h,-h,-h,-h]
+  z_corners = [w/2, -w/2, -w/2, w/2, w/2, -w/2, -w/2, w/2]
 
-  return detections
+  corners = np.array([x_corners, y_corners, z_corners], dtype=np.float32)
+  corners_3d = np.dot(R, corners).transpose(1, 0)
+  return corners_3d
+
+def compute_box_3d(dim, location, rotation_y):
+  # dim: 3
+  # location: 3
+  # rotation_y: 1
+  # return: 8 x 3
+  corners_3d = comput_corners_3d(dim, rotation_y)
+  corners_3d = corners_3d + np.array(location, dtype=np.float32).reshape(1, 3)
+  return corners_3d
+
+def draw_box_3d(image, corners, c=(255, 0, 255), same_color=False):
+  face_idx = [[0,1,5,4],
+              [1,2,6, 5],
+              [3,0,4,7],
+              [2,3,7,6]]
+  right_corners = [1, 2, 6, 5] if not same_color else []
+  left_corners = [0, 3, 7, 4] if not same_color else []
+  thickness = 4 if same_color else 2
+  corners = corners.astype(np.int32)
+  for ind_f in range(3, -1, -1):
+    f = face_idx[ind_f]
+    for j in range(4):
+      # print('corners', corners)
+      cc = c
+      # if (f[j] in left_corners) and (f[(j+1)%4] in left_corners):
+      #   cc = (255, 0, 0)
+      # if (f[j] in right_corners) and (f[(j+1)%4] in right_corners):
+      #   cc = (0, 0, 255)
+      # try:
+      cv2.line(image, (corners[f[j], 0], corners[f[j], 1]),
+          (corners[f[(j+1)%4], 0], corners[f[(j+1)%4], 1]), cc, thickness, lineType=cv2.LINE_AA)
+
+    if ind_f == 0:
+      try:
+        cv2.line(image, (corners[f[0], 0], corners[f[0], 1]),
+                 (corners[f[2], 0], corners[f[2], 1]), c, 1, lineType=cv2.LINE_AA)
+        cv2.line(image, (corners[f[1], 0], corners[f[1], 1]),
+                 (corners[f[3], 0], corners[f[3], 1]), c, 1, lineType=cv2.LINE_AA)
+      except:
+        pass
+    # top_idx = [0, 1, 2, 3]
+  return image
+
+def return_four_frames(images, resize=False):
+  # Arrange frames
+  img_top = np.hstack((images[0],images[1]))
+  img_bot = np.hstack((images[2],images[3]))
+  all_imgs = np.vstack((img_top,img_bot))
+
+  # Resize and show images
+  h, w, d = all_imgs.shape
+  ratio = w / h
+
+  if resize:
+    all_imgs = cv2.resize(all_imgs,(resize,int(resize/ratio)))
+
+  return all_imgs
+
+def draw_3D_labels(images, labels, calib):
+    projected_boxes, boxes = dets_3D_wcf_to_dets_2D(labels, calib)
+
+    for i in range(len(images[:4])):
+      for j in range(len(labels)):
+        if labels[j]['current']:
+          colour = (255,0,0)
+        else:
+          colour = (0,0,255)
+        draw_box_3d(images[i], projected_boxes[i,j], c=colour)
+
+    if len(images) > 4:
+        images[-1] = return_four_frames(images)
+    else:
+        images.append(return_four_frames(images) )
+    return images
