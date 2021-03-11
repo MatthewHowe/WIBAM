@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1334</width>
+    <width>1326</width>
     <height>931</height>
    </rect>
   </property>
@@ -277,7 +277,7 @@
      <rect>
       <x>940</x>
       <y>700</y>
-      <width>281</width>
+      <width>291</width>
       <height>31</height>
      </rect>
     </property>
@@ -404,7 +404,7 @@
     <property name="geometry">
      <rect>
       <x>150</x>
-      <y>90</y>
+      <y>70</y>
       <width>67</width>
       <height>17</height>
      </rect>
@@ -442,9 +442,9 @@
    <widget class="QLabel" name="FLpoint">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>160</y>
-      <width>67</width>
+      <x>10</x>
+      <y>163</y>
+      <width>111</width>
       <height>16</height>
      </rect>
     </property>
@@ -455,10 +455,10 @@
    <widget class="QLabel" name="FRpoint">
     <property name="geometry">
      <rect>
-      <x>150</x>
+      <x>140</x>
       <y>160</y>
-      <width>67</width>
-      <height>17</height>
+      <width>111</width>
+      <height>20</height>
      </rect>
     </property>
     <property name="text">
@@ -468,8 +468,8 @@
    <widget class="QLabel" name="RLpoint">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>230</y>
+      <x>10</x>
+      <y>233</y>
       <width>67</width>
       <height>17</height>
      </rect>
@@ -483,7 +483,7 @@
      <rect>
       <x>150</x>
       <y>230</y>
-      <width>67</width>
+      <width>61</width>
       <height>17</height>
      </rect>
     </property>
@@ -494,7 +494,7 @@
    <widget class="QLabel" name="FRpointGround">
     <property name="geometry">
      <rect>
-      <x>150</x>
+      <x>140</x>
       <y>180</y>
       <width>67</width>
       <height>17</height>
@@ -507,8 +507,8 @@
    <widget class="QLabel" name="FLpointGround">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>180</y>
+      <x>10</x>
+      <y>183</y>
       <width>67</width>
       <height>16</height>
      </rect>
@@ -520,8 +520,8 @@
    <widget class="QLabel" name="RLpointGround">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>247</y>
+      <x>10</x>
+      <y>250</y>
       <width>67</width>
       <height>20</height>
      </rect>
@@ -547,7 +547,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>90</y>
+      <y>70</y>
       <width>81</width>
       <height>17</height>
      </rect>
@@ -595,13 +595,137 @@
      <string>Remove this object</string>
     </property>
    </widget>
+   <widget class="QCheckBox" name="visibleCheckBox">
+    <property name="geometry">
+     <rect>
+      <x>280</x>
+      <y>690</y>
+      <width>92</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>CheckBox</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_16">
+    <property name="geometry">
+     <rect>
+      <x>1240</x>
+      <y>700</y>
+      <width>101</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>18</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Visible</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_17">
+    <property name="geometry">
+     <rect>
+      <x>1240</x>
+      <y>770</y>
+      <width>16</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>H</string>
+    </property>
+   </widget>
+   <widget class="QDoubleSpinBox" name="heightSpinBox_2">
+    <property name="geometry">
+     <rect>
+      <x>1260</x>
+      <y>740</y>
+      <width>71</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="singleStep">
+     <double>0.100000000000000</double>
+    </property>
+    <property name="value">
+     <double>2.500000000000000</double>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="cam0SpinBox">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>330</y>
+      <width>48</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="spinBox_3">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>330</y>
+      <width>48</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="spinBox_4">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>330</y>
+      <width>48</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="spinBox_5">
+    <property name="geometry">
+     <rect>
+      <x>190</x>
+      <y>330</y>
+      <width>48</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_18">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>290</y>
+      <width>231</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>18</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Sync offsets</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1334</width>
+     <width>1326</width>
      <height>22</height>
     </rect>
    </property>

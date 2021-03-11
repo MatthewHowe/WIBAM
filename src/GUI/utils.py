@@ -1,6 +1,11 @@
+# from .lib.dataset.datasets.coco_tools import coco
+# from ..lib.dataset.datasets.coco_tools import coco
+from lib.dataset.datasets.coco_tools import coco
 import numpy as np
 import cv2
 import math
+import copy
+import random
 
 def det_3D_to_BBox_3D(detections, calib):
   r"""
@@ -86,7 +91,9 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
       bounding_box_ccf = box.transpose()
       bounding_box_ccf = np.matmul(R_wc, bounding_box_ccf)
       bounding_box_ccf = np.add(bounding_box_ccf, tvec)
-
+      if True in (bounding_box_ccf[2] < 0):
+        # print("Behind camera {} {}".format(cam, obj))
+        continue
       bounding_box_cam = np.matmul(P, bounding_box_ccf)
       divide = bounding_box_cam[2,:]
       bounding_box_cam = np.divide(
@@ -134,10 +141,10 @@ def compute_box_3d(dim, location, rotation_y):
   return corners_3d
 
 def draw_box_3d(image, corners, c=(255, 0, 255), same_color=False):
-  face_idx = [[0,1,5,4],
+  face_idx = [[0,1,5,4], #FLB, FRB, FRT, FLT
               [1,2,6, 5],
               [3,0,4,7],
-              [2,3,7,6]]
+              [2,3,7,6]] #RRB, RLB, RLT, RRT
   right_corners = [1, 2, 6, 5] if not same_color else []
   left_corners = [0, 3, 7, 4] if not same_color else []
   thickness = 4 if same_color else 2
@@ -196,4 +203,24 @@ def draw_3D_labels(images, labels, calib):
         images[-1] = return_four_frames(images)
     else:
         images.append(return_four_frames(images) )
-    return images
+    return images, boxes, projected_boxes.astype(int)
+
+def get_annotations(idx, ann_path):
+  CoCo = coco.COCO(ann_path)
+  annotation_id = CoCo.getAnnIds(imgIds=[idx])
+  annotation = copy.deepcopy(
+    CoCo.loadAnns(ids=annotation_id)
+  )
+
+  # for i in range(4):
+  #   np.set_printoptions(precision=5)
+  #   imgs = CoCo.loadImgs(ids=[i])[0]
+  #   P = imgs["P"]
+  #   tvec = np.array(imgs["tvec"])
+  #   # P_cw = np.linalg.inv(P)
+  #   rvec = np.array(imgs["rvec"])
+  #   R_wc = cv2.Rodrigues(rvec)[0]
+  #   R_cw = np.linalg.inv(R_wc)
+  #   print(np.matmul(R_cw, tvec))
+
+  return annotation

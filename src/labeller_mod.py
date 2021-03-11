@@ -16,10 +16,12 @@ np.set_printoptions(precision=1)
 import random
 from PyQt5 import QtCore, QtGui, QtWidgets
 from GUI.utils import draw_3D_labels
+from GUI.utils import get_annotations
 
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        self.sync_offsets = [0,0,0,0]
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1334, 931)
 
@@ -28,9 +30,9 @@ class Ui_MainWindow(object):
         image_list_file.close()
 
 
-        self.image_dir = "data/wibam/frames/"
+        self.image_dir = "data/wibam/frames_old/"
         self.hand_labels = "data/wibam/annotations/hand_labels/"
-        self.auto_labels = "data/wibam/annotations"
+        self.auto_labels = "data/wibam/annotations/wibam_val.json"
         self.image_extension = ".jpg"
         self.image_idx = 0
         self.image_id = '0'
@@ -89,6 +91,32 @@ class Ui_MainWindow(object):
         self.widthSpinBox.setSingleStep(0.1)
         self.widthSpinBox.setProperty("value", 2.5)
         self.widthSpinBox.setObjectName("widthSpinBox")
+
+        self.cam0SpinBox = QtWidgets.QSpinBox(self.centralwidget)
+        self.cam0SpinBox.setGeometry(QtCore.QRect(10, 330, 48, 26))
+        self.cam0SpinBox.setSingleStep(1)
+        self.cam0SpinBox.setProperty("value", 0)
+        self.cam0SpinBox.setObjectName("cam0SpinBox")
+        self.cam0SpinBox.setMinimum(-10)
+        self.cam1SpinBox = QtWidgets.QSpinBox(self.centralwidget)
+        self.cam1SpinBox.setGeometry(QtCore.QRect(70, 330, 48, 26))
+        self.cam1SpinBox.setSingleStep(1)
+        self.cam1SpinBox.setProperty("value", 0)
+        self.cam1SpinBox.setObjectName("cam1SpinBox")
+        self.cam1SpinBox.setMinimum(-10)
+        self.cam2SpinBox = QtWidgets.QSpinBox(self.centralwidget)
+        self.cam2SpinBox.setGeometry(QtCore.QRect(130, 330, 48, 26))
+        self.cam2SpinBox.setSingleStep(1)
+        self.cam2SpinBox.setProperty("value", 0)
+        self.cam2SpinBox.setObjectName("cam2SpinBox")
+        self.cam2SpinBox.setMinimum(-10)
+        self.cam3SpinBox = QtWidgets.QSpinBox(self.centralwidget)
+        self.cam3SpinBox.setGeometry(QtCore.QRect(190, 330, 48, 26))
+        self.cam3SpinBox.setSingleStep(1)
+        self.cam3SpinBox.setProperty("value", 0)
+        self.cam3SpinBox.setObjectName("cam3SpinBox")
+        self.cam3SpinBox.setMinimum(-10)
+
         self.label_5 = QtWidgets.QLabel(self.centralwidget)
         self.label_5.setGeometry(QtCore.QRect(1140, 770, 16, 20))
         self.label_5.setObjectName("label_5")
@@ -124,6 +152,15 @@ class Ui_MainWindow(object):
         self.label_9.setFont(font)
         self.label_9.setAlignment(QtCore.Qt.AlignCenter)
         self.label_9.setObjectName("label_9")
+
+        self.label_18 = QtWidgets.QLabel(self.centralwidget)
+        self.label_18.setGeometry(QtCore.QRect(10, 290, 231, 31))
+        font = QtGui.QFont()
+        font.setPointSize(18)
+        self.label_18.setFont(font)
+        self.label_18.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_18.setObjectName("label_18")
+
         self.label_10 = QtWidgets.QLabel(self.centralwidget)
         self.label_10.setGeometry(QtCore.QRect(940, 700, 281, 31))
         font = QtGui.QFont()
@@ -231,10 +268,10 @@ class Ui_MainWindow(object):
         self.label_15.setObjectName("label_15")
 
         self.removeObjectButton = QtWidgets.QPushButton(self.centralwidget)
-        self.removeObjectButton.setGeometry(QtCore.QRect(358, 840, 150, 25))
+        self.removeObjectButton.setGeometry(QtCore.QRect(10, 840, 150, 25))
         self.removeObjectButton.setObjectName("removeObjectButton")
         self.removeAllObjectsButton = QtWidgets.QPushButton(self.centralwidget)
-        self.removeAllObjectsButton.setGeometry(QtCore.QRect(348, 875, 170, 25))
+        self.removeAllObjectsButton.setGeometry(QtCore.QRect(10, 875, 170, 25))
         self.removeAllObjectsButton.setObjectName("removeObjectButton")
 
         MainWindow.setCentralWidget(self.centralwidget)
@@ -249,8 +286,6 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
-        self.create_new_object()
-        self.next_image()
 
         self.imageSpinBox.valueChanged.connect(self.change_cam)
         self.objectSpinBox.valueChanged.connect(self.update_spin_params)
@@ -262,6 +297,10 @@ class Ui_MainWindow(object):
         self.heightSpinBox.valueChanged.connect(self.update_params)
         self.rotSpinBox.valueChanged.connect(self.update_params)
         self.visibleSpinBox.valueChanged.connect(self.update_params)
+        self.cam0SpinBox.valueChanged.connect(self.sync_image)
+        self.cam1SpinBox.valueChanged.connect(self.sync_image)
+        self.cam2SpinBox.valueChanged.connect(self.sync_image)
+        self.cam3SpinBox.valueChanged.connect(self.sync_image)
 
         self.spin_boxes = [
             self.xSpinBox, self.ySpinBox, self.zSpinBox,
@@ -278,6 +317,9 @@ class Ui_MainWindow(object):
         self.initLabelButton.clicked.connect(self.init_labels)
         self.estimateLabelButton.clicked.connect(self.estimate_labels)
         self.deleteLabelButton.clicked.connect(self.delete_labels)
+
+        self.create_new_object()
+        self.next_image()
         self.update()
         
 
@@ -319,13 +361,17 @@ class Ui_MainWindow(object):
         self.label_17.setText(_translate("MainWindow", "Idx #: "))
         self.label_14.setText(_translate("MainWindow", "Num objects:"))
         self.label_15.setText(_translate("MainWindow", "Camera:"))
+        self.label_18.setText(_translate("MainWindow", "Sync offsets"))
         self.removeObjectButton.setText(_translate("MainWindow", "Remove this object"))
         self.removeAllObjectsButton.setText(_translate("MainWindow", "Remove all objects"))
 
     def update(self):
+        self.update_current_images()
         self.draw_labels()
         self.change_cam()
         self.objectSpinBox.setMaximum(len(self.current_objects)-1)
+        if len(self.current_objects) > 0:
+            self.objectSpinBox.setMinimum(0)
 
     def set_image(self, opencv_image):
         h, w, c = opencv_image.shape
@@ -359,11 +405,22 @@ class Ui_MainWindow(object):
         self.current_images = []
         self.drawnon_images = []
         for i in range(len(self.cams)):
-            file_name = self.image_dir + str(self.cams[i]) + "/" + self.image_id + self.image_extension
+            img_id = str(int(self.image_id) + self.sync_offsets[i])
+            file_name = self.image_dir + str(self.cams[i]) + "/" + img_id + self.image_extension
             img = cv2.imread(file_name)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             self.current_images.append(img)
             self.drawnon_images.append(img.copy())
+        self.draw_labels()
+
+    def sync_image(self):
+        self.sync_offsets[0] = self.cam0SpinBox.value()
+        self.sync_offsets[1] = self.cam1SpinBox.value()
+        self.sync_offsets[2] = self.cam2SpinBox.value()
+        self.sync_offsets[3] = self.cam3SpinBox.value()
+        self.update_current_images()
+        self.change_cam()
+        self.imageSpinBox.setMaximum(len(self.drawnon_images)-1)
         self.draw_labels()
 
     def next_image(self):
@@ -384,16 +441,21 @@ class Ui_MainWindow(object):
         self.imageSpinBox.setMaximum(len(self.drawnon_images)-1)
         self.load_labels()
 
-    def create_new_object(self):
+    def create_new_object(self, loc=None):
         object_id = self.num_objects
         object_dict = {}
         object_dict['current'] = True
         object_dict['l'] = 4.78
         object_dict['w'] = 2.1
-        object_dict['h'] = 1.86 
-        object_dict['x'] = 20. + random.randint(-10,10)
-        object_dict['y'] = 20. + random.randint(-10,10)
-        object_dict['z'] = 0. 
+        object_dict['h'] = 1.86
+        if loc is None or loc is False: 
+            object_dict['x'] = 20. + random.randint(-10,10)
+            object_dict['y'] = 20. + random.randint(-10,10)
+            object_dict['z'] = 0.
+        else:
+            object_dict['x'] = loc[0]
+            object_dict['y'] = loc[1]
+            object_dict['z'] = 0.
         object_dict['rot'] = 0. + random.randint(0,360)
         object_dict['visibility'] = [1,1,1,1]
         self.current_objects.append(object_dict)
@@ -402,6 +464,8 @@ class Ui_MainWindow(object):
         self.objectSpinBox.setMinimum(0)
         self.objectSpinBox.setMaximum(self.num_objects-1)
         self.numObjectsLabel.setText(str(self.num_objects))
+
+        self.update()
 
     def remove_current_object(self):
         for spin_box in self.spin_boxes:
@@ -435,6 +499,9 @@ class Ui_MainWindow(object):
     def update_params(self):
         if len(self.current_objects) < 1:
             return
+        if len(self.current_objects)-1 < self.objectSpinBox.value():
+            self.objectSpinBox.setValue(self.objectSpinBox.value()-1)
+        self.objectSpinBox.setMaximum(len(self.current_objects))
         obj = self.current_objects[self.objectSpinBox.value()]
         obj['x'] = self.xSpinBox.value()
         obj['y'] = self.ySpinBox.value()
@@ -469,6 +536,10 @@ class Ui_MainWindow(object):
         self.lengthSpinBox.setValue(obj['l'])
         self.widthSpinBox.setValue(obj['w'])
         self.heightSpinBox.setValue(obj['h'])
+        self.cam0SpinBox.setValue(self.sync_offsets[0])
+        self.cam1SpinBox.setValue(self.sync_offsets[1])
+        self.cam2SpinBox.setValue(self.sync_offsets[2])
+        self.cam3SpinBox.setValue(self.sync_offsets[3])
 
         self.update()
 
@@ -477,13 +548,18 @@ class Ui_MainWindow(object):
 
     def save_labels(self):
         labels = {}
+        ann_info = {}
+        save_dict = {}
         for i in range(len(self.current_objects)):
             labels[i] = self.current_objects[i]
 
+        ann_info["sync_offsets"] = self.sync_offsets
+        save_dict["ann_info"] = ann_info
+        save_dict["annotations"] = labels
         
         save_file = self.hand_labels + self.image_id + ".json"
         with open(save_file, 'w') as file:
-            json.dump(labels, file, sort_keys=True, indent=4)
+            json.dump(save_dict, file, sort_keys=True, indent=4)
 
 
     def delete_labels(self):
@@ -492,7 +568,16 @@ class Ui_MainWindow(object):
             os.remove(file_name)
 
     def estimate_labels(self):
-        print("NOT IMPLEMETNED")
+        annotations = get_annotations(self.image_idx, self.auto_labels)
+        self.current_objects = []
+        for annotation in annotations:
+            ground_pt = annotation['rough_ground_pt']
+            try:
+                location = ground_pt[0]
+                self.create_new_object(location)
+            except:
+                location = ground_pt
+                self.create_new_object(location)
 
     def init_labels(self):
         file_name = self.hand_labels + self.image_id + ".json"
@@ -505,12 +590,15 @@ class Ui_MainWindow(object):
             with open(prev_file_name, "r") as file:
                 labels = json.load(file)
         else:
+            print("[INFO] No prior labels")
             labels = {}
 
         self.current_objects = []
-        for key, val in labels.items():
+        for key, val in labels["annotations"].items():
             self.current_objects.append(val)
         
+        self.sync_offsets = labels["ann_info"]["sync_offsets"]
+        self.update_spin_params()
         self.update()
 
     def load_labels(self):
@@ -519,12 +607,15 @@ class Ui_MainWindow(object):
             with open(file_name) as file:
                 labels = json.load(file)
         else:
-            labels = {}
+            labels = None
         
         self.current_objects = []
-        for key, val in labels.items():
-            self.current_objects.append(val)
+        if labels is not None:
+            for key, val in labels["annotations"].items():
+                self.current_objects.append(val)
 
+            self.sync_offsets = labels["ann_info"]["sync_offsets"]
+        self.update_spin_params()
         self.update()
 
     def draw_labels(self):
