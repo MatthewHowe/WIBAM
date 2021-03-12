@@ -98,11 +98,6 @@ class LitWIBAM(pl.LightningModule):
 		return {"optimizer": optimizer, "lr_scheduler": scheduler,
 				"monitor": "val_tot"}
 
-	def on_train_epoch_start(self):
-		self.model.rot.train(False)
-		for name, param in self.model.named_parameters():
-			print("{}, {}".format(name,param.requires_grad))
-
 	def training_step(self, train_batch, batch_idx):
 		if self.opt.mixed_dataset is not None:
 			main_out = self(train_batch[0]['image'])[0]
