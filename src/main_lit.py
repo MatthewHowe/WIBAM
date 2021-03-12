@@ -88,7 +88,7 @@ class LitWIBAM(pl.LightningModule):
 
 	def configure_optimizers(self):
 		for name, param in self.model.named_parameters():
-			print("{}, {}".format(name,param.requires_grad))
+			# Setting rotation to not change weights
 			if name.split(".")[0] == "rot":
 				param.requires_grad=False
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
@@ -98,15 +98,10 @@ class LitWIBAM(pl.LightningModule):
 		return {"optimizer": optimizer, "lr_scheduler": scheduler,
 				"monitor": "val_tot"}
 
-	# def on_validation_epoch_start(self):
-		# for param in self.model.parameters():
-		# 	print("{}, {}".format(param.name,param.requires_grad))
-
 	def on_train_epoch_start(self):
 		self.model.rot.train(False)
 		for name, param in self.model.named_parameters():
 			print("{}, {}".format(name,param.requires_grad))
-	# 	self.model.rot.train(False)
 
 	def training_step(self, train_batch, batch_idx):
 		if self.opt.mixed_dataset is not None:
@@ -247,5 +242,5 @@ if __name__ == '__main__':
 						 plugins=[my_ddp]
 						 )
 	
-	# trainer.test(model, test_dataloaders=model.val_dataloader())
+	trainer.test(model, test_dataloaders=model.val_dataloader())
 	trainer.fit(model)
