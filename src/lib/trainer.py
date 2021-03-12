@@ -134,7 +134,7 @@ class MultiviewLoss(torch.nn.Module):
       losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
     
     
-    output = outputs[0]
+    output = outputs
     output = self._sigmoid_output(output)
 
     if not self.opt.mv_only:

@@ -35,11 +35,13 @@ class LitWIBAM(pl.LightningModule):
 	def __init__(self):
 		super().__init__()
 		opt = opts().parse()
-		Dataset = get_dataset("nuscenes")
+		Dataset = get_dataset(opt.dataset)
 		opt = opts().update_dataset_info_and_set_heads(opt, Dataset)
 		self.opt = opt
-		self.main_loss = GenericLoss(opt)
-		self.mix_loss = MultiviewLoss(opt)
+		if self.opt.dataset == "wibam":
+			self.main_loss = MultiviewLoss(opt)
+		else:
+			self.main_loss = GenericLoss(opt)
 		self.model = create_model(opt.arch, opt.heads, opt.head_conv, opt=opt)
 
 	def forward(self, x):
@@ -85,12 +87,26 @@ class LitWIBAM(pl.LightningModule):
 		return DataLoader
 
 	def configure_optimizers(self):
+		for name, param in self.model.named_parameters():
+			print("{}, {}".format(name,param.requires_grad))
+			if name.split(".")[0] == "rot":
+				param.requires_grad=False
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
 		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 						optimizer, mode='min', factor=0.1, patience=2,
 						threshold=0.001, verbose=True)
 		return {"optimizer": optimizer, "lr_scheduler": scheduler,
 				"monitor": "val_tot"}
+
+	# def on_validation_epoch_start(self):
+		# for param in self.model.parameters():
+		# 	print("{}, {}".format(param.name,param.requires_grad))
+
+	def on_train_epoch_start(self):
+		self.model.rot.train(False)
+		for name, param in self.model.named_parameters():
+			print("{}, {}".format(name,param.requires_grad))
+	# 	self.model.rot.train(False)
 
 	def training_step(self, train_batch, batch_idx):
 		if self.opt.mixed_dataset is not None:
@@ -231,5 +247,5 @@ if __name__ == '__main__':
 						 plugins=[my_ddp]
 						 )
 	
-	trainer.test(model, test_dataloaders=model.val_dataloader())
+	# trainer.test(model, test_dataloaders=model.val_dataloader())
 	trainer.fit(model)
