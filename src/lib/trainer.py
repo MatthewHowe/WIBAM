@@ -133,8 +133,10 @@ class MultiviewLoss(torch.nn.Module):
     else:
       losses = {'hm':0, 'reg':0, 'wh':0, 'mv':0, 'tot':0}
     
-    
-    output = outputs
+    if isinstance(outputs, list):
+      output = outputs[0]
+    else:
+      output = outputs
     output = self._sigmoid_output(output)
 
     if not self.opt.mv_only:
@@ -338,7 +340,7 @@ class Trainer(object):
       self.profiler.interval_trigger("Finish")
 
       del output, loss, loss_stats
-      self.profiler.print_interval_times()
+      # self.profiler.print_interval_times()
       self.profiler.start()
       torch.cuda.empty_cache()
 

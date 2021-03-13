@@ -23,10 +23,12 @@ from pytorch_lightning.overrides.data_parallel import LightningDistributedDataPa
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
+from utils.mv_utils import test_post_process
 from model.decode import generic_decode
 from utils.post_process import generic_post_process
 from utils.collate import default_collate, instance_batching_collate
 from dataset.dataset_factory import mixed_dataset, get_dataset
+from dataset.datasets.wibam import WIBAM_test
 from utils.net import *
 from utils.utils import Profiler, separate_batches
 from trainer import MultiviewLoss, GenericLoss
@@ -84,6 +86,15 @@ class LitWIBAM(pl.LightningModule):
 				drop_last=True, shuffle=False
 			)
 
+		return DataLoader
+
+	def test_dataloader(self):
+		DataLoader = torch.utils.data.DataLoader(
+			WIBAM_test(self.opt),
+			batch_size=1,
+			num_workers=0,
+		   	drop_last=False, shuffle=False
+		)
 		return DataLoader
 
 	def configure_optimizers(self):
@@ -163,6 +174,7 @@ class LitWIBAM(pl.LightningModule):
 		self.log("val_variance", variance, on_epoch=True)
 
 	def on_test_epoch_start(self):
+		# loss =
 		if self.opt.test:
 			self.results = {}
 
@@ -193,10 +205,17 @@ class LitWIBAM(pl.LightningModule):
 				self.results
 			)
 		else:
-			return self.validation_step(test_batch, test_idx)
+			out = self(test_batch['image'])[0]
+			anns = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
+			detections = test_post_process(out, anns["calib"])
+			for score in detections['scores'][0]:
+				if score > 0.8:
+					print("Good detection")
+
+			return detections
 
 	def test_epoch_end(self, test_step_outputs):
-		self.validation_epoch_end(test_step_outputs)
+		print("FINISHED")
 
 if __name__ == '__main__':
 
@@ -205,7 +224,7 @@ if __name__ == '__main__':
 		gclout = fsspec.filesystem(opt.output_path.split(":", 1)[0])
 		print(gclout.isdir(opt.output_path))
 		print(gclout.isdir(opt.output_path))
-	# model
+
 	model = LitWIBAM()
 	state_dict_ = torch.load(opt.load_model)['state_dict']
 	state_dict = {}
@@ -214,21 +233,22 @@ if __name__ == '__main__':
 			state_dict[k[7:]] = state_dict_[k]
 		else:
 			state_dict[k] = state_dict_[k]
-	state_dict = {'model.' + str(key): val for key, val in state_dict.items()}
+	state_dict = {'model.'+str(key): val for key, val in state_dict.items()}
 	model.load_state_dict(state_dict)
 
-	checkpoint_callback = ModelCheckpoint(monitor="val_main_tot", save_last=True, 
-										  save_top_k=2, mode='min', period=2
-										  )
+	checkpoint_callback = ModelCheckpoint(
+		monitor="val_main_tot", save_last=True, 
+		save_top_k=2, mode='min', period=2
+	)
 										  
 	class MyDDP(DDPPlugin):
 		def configure_ddp(self, model, device_ids=opt.gpus):
-			model = LightningDistributedDataParallel(model, device_ids, find_unused_parameters=True)
+			model = LightningDistributedDataParallel(
+				model, device_ids, find_unused_parameters=True
+			)
 			return model
 	my_ddp = MyDDP()
 
-
-	# training
 	trainer = pl.Trainer(checkpoint_callback=True,
 						 callbacks=[checkpoint_callback],
 						 default_root_dir=opt.output_path, 
@@ -236,6 +256,6 @@ if __name__ == '__main__':
 						 check_val_every_n_epoch=1,
 						 plugins=[my_ddp]
 						 )
-	
-	trainer.test(model, test_dataloaders=model.val_dataloader())
+
+	trainer.test(model)
 	trainer.fit(model)

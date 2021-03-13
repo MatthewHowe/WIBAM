@@ -120,11 +120,15 @@ class ReprojectionLoss(nn.Module):
     centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
     centers_offset = centers + decoded_output['amodel_offset']
 
-    centers = translate_centre_points(centers, np.array([960,540]), 1920, 
-                                      (200,112), BN, max_objects)
+    centers = translate_centre_points(
+      centers, np.array([960,540]), 1920, 
+      (200,112), BN, max_objects
+    )
 
-    centers_offset = translate_centre_points(centers_offset, np.array([960,540]), 
-                                             1920, (200,112), BN, max_objects)
+    centers_offset = translate_centre_points(
+      centers_offset, np.array([960,540]), 
+      1920, (200,112), BN, max_objects
+    )
 
     # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30)
     detections['depth'] = decoded_output['dep'] * 0.80

@@ -11,6 +11,7 @@ import cv2
 import os
 import math
 import copy
+from torch.utils.data import Dataset, DataLoader
 
 from utils.image import get_affine_transform, affine_transform
 from ..generic_dataset import GenericDataset
@@ -536,3 +537,67 @@ class WIBAM(GenericDataset):
         '{}/results_nuscenes_{}.json '.format(save_dir, task) + \
         '--output_dir {}/nuscenes_evaltracl__output/ '.format(save_dir) + \
         '--dataroot ../data/nuscenes/v1.0-trainval/')
+
+
+class WIBAM_test(Dataset):
+  mean = np.array([0.40789655, 0.44719303, 0.47026116],
+                   dtype=np.float32).reshape(1, 1, 3)
+  std  = np.array([0.2886383, 0.27408165, 0.27809834],
+                   dtype=np.float32).reshape(1, 1, 3)
+  def __init__(self, opt=None):
+    self.data_dir = os.path.join(opt.data_dir, 'wibam')
+    self.images_dir = os.path.join(self.data_dir, 'frames')
+    self.labels_dir = os.path.join(self.data_dir, 'annotations/hand_labels')
+    self.paths = {}
+    self.image_paths = []
+    self.opt = opt
+    idx = 0
+    for dirpath, dirnames, filenames in os.walk(self.labels_dir):
+      if len(dirnames) == 0:
+        cam = dirpath.split("/")[-1]
+        for filename in filenames:
+          img_num = filename.split(".")[0]
+          self.paths[idx] = {"image_path": os.path.join(self.images_dir, cam, img_num + ".jpg"),
+                             "label_path": os.path.join(dirpath, filename)}
+          idx += 1
+
+  def __getitem__(self, index):
+    image_path = self.paths[index]["image_path"]
+    image_num = image_path.split("/")[-1].split(".jpg")[0]
+    cam_num = image_path.split("/")[-2]
+    image = cv2.imread(image_path)
+    center = np.array(
+      [image.shape[1] / 2., image.shape[0] / 2.], dtype=np.float32
+    )
+    trans_input = get_affine_transform(
+      center , 1, 0, [self.opt.input_w, self.opt.input_h]
+    )
+
+    image = self._get_input(image, trans_input)
+    
+    return {"image": image, "cam_num": cam_num, "image_num": image_num,
+            "index": index}
+
+  def _get_input(self, img, trans_input):
+    inp = cv2.warpAffine(img, trans_input,
+                        (self.opt.input_w, self.opt.input_h),
+                        flags=cv2.INTER_LINEAR)
+    inp = (inp.astype(np.float32) / 255.)
+    inp = (inp - self.mean) / self.std
+    
+    inp = inp.transpose(2, 0, 1)
+    return inp
+  
+  def get_annotations(self, index):
+    label_path = self.paths[index]['label_path']
+    cam = label_path.split('/')[-2]
+    with open(label_path, "r") as file:
+      label = json.load(file)
+    calib_dir = os.path.join(
+      self.data_dir, "calib/calibration_{}.npz".format(cam)
+    )
+    calib = np.load(calib_dir)
+    return {"label": label, "calib": calib}
+
+  def __len__(self):
+    return len(self.paths)

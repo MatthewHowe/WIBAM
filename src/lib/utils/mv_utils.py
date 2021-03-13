@@ -2,7 +2,8 @@
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import torch.nn as nn
-from utils.ddd_utils import ddd2locrot
+from model.utils import _sigmoid
+from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
 import torch
 import math
 import time
@@ -62,9 +63,11 @@ def det_cam_to_det_3D_ccf(model_detections, calib):
         format: [{loc(3), size(3), rot(1)}]
   """
   # Get locations of objects
-  locations = unproject_2d_to_3d(model_detections['center'], 
-                                 model_detections['depth'], 
-                                 calib)
+  locations = unproject_2d_to_3d(
+    model_detections['center'], 
+    model_detections['depth'], 
+    calib["P_det"]
+  )
 
   # Get rotation of objects
   alphas = get_alpha(model_detections['rot'])
@@ -95,8 +98,8 @@ def unproject_2d_to_3d(center, depth, calib):
   v = center[:,:,1]
 
   z = torch.squeeze(depth,-1)
-  x = ((u - calib['P_det'][:, 0, 2, None]) * z) / calib['P_det'][:, 0, 0, None]
-  y = ((v - calib['P_det'][:, 1, 2, None]) * z) / calib['P_det'][:, 1, 1, None]
+  x = ((u - calib[:, 0, 2, None]) * z) / calib[:, 0, 0, None]
+  y = ((v - calib[:, 1, 2, None]) * z) / calib[:, 1, 1, None]
 
   return torch.stack((x,y,z)).permute(1,2,0).to(device='cuda')
 
@@ -238,7 +241,7 @@ def det_3D_to_BBox_3D(detections, calib):
   bounding_box_3D = torch.zeros((BN, objs, 8, 3))
 
   for batch in range(BN):
-    rotation_camera = calib['theta_X_d_det'][batch]*math.pi/180 - math.pi/2
+    
     P = calib['P_det'][batch]
     center_x = P[0,2]
     f_x = P[0,0]
@@ -260,6 +263,7 @@ def det_3D_to_BBox_3D(detections, calib):
     rotation_object = torch.where(rotation_object < -np.pi, 
                                   rotation_object + 2 * np.pi, 
                                   rotation_object)
+    rotation_camera = calib['theta_X_d_det'][batch]*math.pi/180 - math.pi/2
     rotation_object = rotation_camera - rotation_object
     c, s = torch.cos(rotation_object), torch.sin(rotation_object)
     rotation_matrix = torch.zeros((objs, 3, 3))
@@ -525,4 +529,79 @@ def return_four_frames(images, resize=False):
     all_imgs = cv2.resize(all_imgs,(resize,int(resize/ratio)))
 
   return all_imgs
-  
+
+def test_post_process(model_output, calib):
+  detections = {}
+  max_objects = 50
+  BN = 1
+  model_output = _sigmoid_output(model_output)
+  decoded_output = decode_output(model_output, max_objects)
+  centers = decoded_output['bboxes'].reshape(BN,max_objects,2, 2).mean(axis=2)
+  centers_offset = centers + decoded_output['amodel_offset']
+
+  centers = translate_centre_points(
+    centers, np.array([960,540]), 1920, 
+    (200,112), BN, max_objects
+  )
+
+  centers_offset = translate_centre_points(
+    centers_offset, np.array([960,540]), 
+    1920, (200,112), BN, max_objects
+  )
+  detections['scores'] = decoded_output['scores']
+  detections['depth'] = decoded_output['dep'] * 0.80
+  detections['size'] = decoded_output['dim'] 
+  detections['rot'] = decoded_output['rot']
+  detections['center'] = centers_offset
+
+  P = calib["camera_matrix"]
+
+  u = detections['center'][:,:,0]
+  v = detections['center'][:,:,1]
+
+  z = torch.squeeze(detections['depth'],-1)
+  x = ((u - P[0, 2]) * z) / P[0, 0]
+  y = ((v - P[1, 2]) * z) / P[1, 1]
+
+  detections['locations'] = torch.stack((x,y,z)).permute(1,2,0).to(device='cuda')
+
+  detections['alpha'] = get_alpha(detections['rot'])
+  locations_wcf = torch.zeros((max_objects, 3)).to(device="cuda")
+
+  ct = detections['center'][0]
+  cam_center_x = P[0,2]
+  focal_length_x = P[0,0]
+  rotation_offset = torch.atan(
+    (ct[:,0]-cam_center_x)/focal_length_x
+  )
+  rotation_object = detections['alpha'] + rotation_offset
+  rotation_object = torch.where(rotation_object > np.pi, 
+                                rotation_object - 2 * np.pi, 
+                                rotation_object)
+  rotation_object = torch.where(rotation_object < -np.pi, 
+                                rotation_object + 2 * np.pi, 
+                                rotation_object)
+  rotation_camera = calib['theta_X_d']*math.pi/180 - math.pi/2
+  detections['rot'] = rotation_camera - rotation_object
+
+  tvec = torch.Tensor(calib['tvec']).to(device="cuda")
+  rvec = calib['rvec']
+  R_cw = np.linalg.inv(cv2.Rodrigues(rvec)[0])
+  R_cw = torch.Tensor(R_cw).to(device="cuda")
+
+  for obj in range(max_objects):
+    loc_ccf = detections['locations'][0][obj].reshape((3,1))
+    loc_wcf = torch.sub(loc_ccf, tvec).float()
+    locations_wcf[obj] = torch.mm(R_cw,loc_wcf).reshape((3))
+
+  detections['location_wcf'] = locations_wcf
+  return detections
+
+def _sigmoid_output(output):
+    if 'hm' in output:
+      output['hm'] = _sigmoid(output['hm'])
+    if 'hm_hp' in output:
+      output['hm_hp'] = _sigmoid(output['hm_hp'])
+    if 'dep' in output:
+      output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
+    return output
