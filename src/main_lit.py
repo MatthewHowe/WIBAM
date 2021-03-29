@@ -294,5 +294,5 @@ if __name__ == '__main__':
 						 plugins=[my_ddp]
 						 )
 
-	trainer.test(model)
+	# trainer.test(model)
 	trainer.fit(model)
