@@ -244,13 +244,13 @@ class ReprojectionLoss(nn.Module):
     self.profiler.interval_trigger("Calculating loss")  
 
     # Make sure that number of detections is equal to number of gt detections
-    # if 'det' in pr_dict:  
-    #   mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
-    #   1
-    # else:
-    #   mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
+    if 'det' in pr_dict:  
+      mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
+      1
+    else:
+      mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
     mv_loss['tot_GIoU'] = mv_loss['tot']
-    mv_loss['tot'] = mv_loss['tot'] # * mv_loss['mult']
+    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
     
     self.profiler.interval_trigger("Multipling loss")
 

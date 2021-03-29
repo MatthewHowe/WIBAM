@@ -270,6 +270,8 @@ if __name__ == '__main__':
 			if not k.startswith('model'):
 				state_dict['model.' + k] = state_dict[k]
 				del state_dict[k]
+			if "base.fc" in k:
+				del state_dict[k]
 
 		model.load_state_dict(state_dict)
 

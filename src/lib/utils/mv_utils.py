@@ -642,12 +642,12 @@ def compare_ground_truth(detection_attributes, annotated_objects, image, calib, 
     matching_stats['2D_iou'] = iou[i]
     stats[i] = matching_stats
 
-  # if opt.show_repro:
-  #   for image in images:
-      # cv2.namedWindow("result", cv2.WINDOW_NORMAL)
-      # cv2.imshow("result", image)
-      # cv2.imshow("bev", bev)
-      # cv2.waitKey(0)
+  if opt.show_repro:
+    for image in images:
+      cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+      cv2.imshow("result", image)
+      cv2.imshow("bev", bev)
+      cv2.waitKey(0)
 
   return stats, images, bev
 
