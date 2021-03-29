@@ -190,7 +190,7 @@ def return_four_frames(images, resize=False):
 
 def draw_3D_labels(images, labels, calib):
     projected_boxes, boxes = dets_3D_wcf_to_dets_2D(labels, calib)
-
+    
     for i in range(len(images[:4])):
       for j in range(len(labels)):
         if labels[j]['current']:
@@ -212,15 +212,5 @@ def get_annotations(idx, ann_path):
     CoCo.loadAnns(ids=annotation_id)
   )
 
-  # for i in range(4):
-  #   np.set_printoptions(precision=5)
-  #   imgs = CoCo.loadImgs(ids=[i])[0]
-  #   P = imgs["P"]
-  #   tvec = np.array(imgs["tvec"])
-  #   # P_cw = np.linalg.inv(P)
-  #   rvec = np.array(imgs["rvec"])
-  #   R_wc = cv2.Rodrigues(rvec)[0]
-  #   R_cw = np.linalg.inv(R_wc)
-  #   print(np.matmul(R_cw, tvec))
-
   return annotation
+

@@ -1,4 +1,5 @@
 import json
+import copy
 import os
 import numpy as np
 
@@ -29,6 +30,7 @@ if __name__ == "__main__":
                 img_num = file_num + sync_offsets[i]
                 img_anns = {}
                 for j in range(len(anns)):
+                    out_obj = copy.deepcopy(anns[str(j)])
                     obj = anns[str(j)]
                     if obj["visibility"][i] > 0:
                         
@@ -42,8 +44,16 @@ if __name__ == "__main__":
                         elevations.append(elevation)
                         visibilities.append(obj["visibility"][i])
                         visible_objects += 1
+
+                        out_obj['location'] = [obj['x'], obj['y'], obj['z']]
+                        out_obj['size'] = [obj['l'], obj['w'], obj['h']]
+                        del out_obj['x'], out_obj['y'], out_obj['z']
+                        del out_obj['l'], out_obj['w'], out_obj['h']
+                        del out_obj['current']
                         
-                        img_anns[j] = obj
+                        out_obj['rot_deg'] = out_obj['rot']
+                        out_obj['rot'] = out_obj['rot'] * (np.pi/180.)
+                        img_anns[j] = out_obj
                 
                 save_dir = anns_dir + "{}/".format(i)
                 if not os.path.exists(save_dir):

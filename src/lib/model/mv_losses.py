@@ -43,8 +43,6 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   Returns:
     loss (float): Return loss
   """
-  # TODO: Better variable names
-  # TODO: Improve comments
   size = [1920,1080]
 
   # Convert bbox format
@@ -130,7 +128,7 @@ class ReprojectionLoss(nn.Module):
       1920, (200,112), BN, max_objects
     )
 
-    # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30)
+    # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30);
     detections['depth'] = decoded_output['dep'] * 0.80
     # detections['depth'] = decoded_output['dep']
     detections['size'] = decoded_output['dim'] 
@@ -148,13 +146,16 @@ class ReprojectionLoss(nn.Module):
     dets_3D_wcf_to_dets_2D(detections, batch)
     self.profiler.interval_trigger("dets_3D_wcf_to_dets_2D")
 
-    gt_centers = translate_centre_points(batch['ctr'].type(torch.float), np.array([960,540]),
-                                         1920, (200,112), BN, max_objects)
+    gt_centers = translate_centre_points( 
+      batch['ctr'].type(torch.float), np.array([960,540]),
+      1920, (200,112), BN, max_objects
+    )
 
     self.profiler.interval_trigger("translate_3")
 
-    cost_matrix, gt_indexes = match_predictions_ground_truth(centers, 
-                          gt_centers, batch['mask'], batch['cam_num'])
+    cost_matrix, gt_indexes = match_predictions_ground_truth(
+      centers, gt_centers, batch['mask'], batch['cam_num']
+    )
     self.profiler.interval_trigger("matching")  
 
     gt_dict = {}
@@ -263,3 +264,6 @@ class ReprojectionLoss(nn.Module):
     self.profiler.pause()
     # self.profiler.print_interval_times()
     return mv_loss
+
+def test_accuracy(detections, annotations, opt):
+  ground_plane_boxes() 

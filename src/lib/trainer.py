@@ -193,6 +193,8 @@ class ModleWithLoss(torch.nn.Module):
     if profiler:
       profiler.interval_trigger("Calculate loss")
     for key, val in loss_stats.items():
+      if val == 0:
+        continue
       loss_stats[key] = val.detach()
     self.LStats.loss_stats = loss_stats
     return outputs[-1], loss

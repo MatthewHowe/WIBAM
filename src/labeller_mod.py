@@ -30,7 +30,7 @@ class Ui_MainWindow(object):
         image_list_file.close()
 
 
-        self.image_dir = "data/wibam/frames_old/"
+        self.image_dir = "data/wibam/frames/"
         self.hand_labels = "data/wibam/annotations/hand_labels/"
         self.auto_labels = "data/wibam/annotations/wibam_val.json"
         self.image_extension = ".jpg"
@@ -97,25 +97,25 @@ class Ui_MainWindow(object):
         self.cam0SpinBox.setSingleStep(1)
         self.cam0SpinBox.setProperty("value", 0)
         self.cam0SpinBox.setObjectName("cam0SpinBox")
-        self.cam0SpinBox.setMinimum(-10)
+        self.cam0SpinBox.setMinimum(-100)
         self.cam1SpinBox = QtWidgets.QSpinBox(self.centralwidget)
         self.cam1SpinBox.setGeometry(QtCore.QRect(70, 330, 48, 26))
         self.cam1SpinBox.setSingleStep(1)
         self.cam1SpinBox.setProperty("value", 0)
         self.cam1SpinBox.setObjectName("cam1SpinBox")
-        self.cam1SpinBox.setMinimum(-10)
+        self.cam1SpinBox.setMinimum(-100)
         self.cam2SpinBox = QtWidgets.QSpinBox(self.centralwidget)
         self.cam2SpinBox.setGeometry(QtCore.QRect(130, 330, 48, 26))
         self.cam2SpinBox.setSingleStep(1)
         self.cam2SpinBox.setProperty("value", 0)
         self.cam2SpinBox.setObjectName("cam2SpinBox")
-        self.cam2SpinBox.setMinimum(-10)
+        self.cam2SpinBox.setMinimum(-100)
         self.cam3SpinBox = QtWidgets.QSpinBox(self.centralwidget)
         self.cam3SpinBox.setGeometry(QtCore.QRect(190, 330, 48, 26))
         self.cam3SpinBox.setSingleStep(1)
         self.cam3SpinBox.setProperty("value", 0)
         self.cam3SpinBox.setObjectName("cam3SpinBox")
-        self.cam3SpinBox.setMinimum(-10)
+        self.cam3SpinBox.setMinimum(-100)
 
         self.label_5 = QtWidgets.QLabel(self.centralwidget)
         self.label_5.setGeometry(QtCore.QRect(1140, 770, 16, 20))
@@ -430,6 +430,7 @@ class Ui_MainWindow(object):
         self.change_cam()
         self.imageSpinBox.setMaximum(len(self.drawnon_images)-1)
         self.load_labels()
+        self.sync_image()
 
     def previous_image(self):
         if self.image_idx > 0:
@@ -527,6 +528,8 @@ class Ui_MainWindow(object):
         for o in self.current_objects:
             if o is not obj:
                 o['current'] = False
+
+        # self.sync_image()
 
         obj['current'] = True
         self.rotSpinBox.setValue(obj['rot'])

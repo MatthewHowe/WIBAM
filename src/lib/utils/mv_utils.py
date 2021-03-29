@@ -4,6 +4,10 @@ import numpy as np
 import torch.nn as nn
 from model.utils import _sigmoid
 from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
+from utils.drawing_utils import draw_results
+from utils.utils import attribute_lists_to_objects, objects_to_attribute_list
+from GUI.utils import draw_3D_labels
+from utils.bbox_iou_evaluation import match_bboxes, bbox_iou, calculate_3D_iou
 import torch
 import math
 import time
@@ -212,8 +216,6 @@ def dets_3D_wcf_to_dets_2D(detections, calib):
       min_bb = torch.min(bounding_box_cam, axis=1)[0]
       max_bb = torch.max(bounding_box_cam, axis=1)[0]
 
-      # Append result to list
-      # TODO: Problem with autograd at this point creating new tensor
       detections_2D[batch,cam,:,0] = min_bb[:,0]
       detections_2D[batch,cam,:,1] = min_bb[:,1]
       detections_2D[batch,cam,:,2] = max_bb[:,0]-min_bb[:,0]
@@ -500,7 +502,7 @@ def get_dir(src_point, rot_rad):
 
 def match_predictions_ground_truth(predicted_centers, gt_centers, gt_mask, cams):
   num_preds = predicted_centers.shape
-  init_value = 1000000
+  init_value = 1e6
   match_indexes = np.zeros((num_preds[0],num_preds[1]), dtype=int)
   match_indexes = np.zeros((num_preds[0],num_preds[1]), dtype=int)
   
@@ -594,7 +596,7 @@ def test_post_process(model_output, calib):
     loc_wcf = torch.sub(loc_ccf, tvec).float()
     locations_wcf[obj] = torch.mm(R_cw,loc_wcf).reshape((3))
 
-  detections['location_wcf'] = locations_wcf
+  detections['location_wcf'] = locations_wcf.reshape(BN, max_objects, 3)
   return detections
 
 def _sigmoid_output(output):
@@ -605,3 +607,61 @@ def _sigmoid_output(output):
     if 'dep' in output:
       output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
     return output
+
+def compare_ground_truth(detection_attributes, annotated_objects, image, calib, opt):
+  max_objects = 50
+  stats = {}
+  for key, val in detection_attributes.items():
+    detection_attributes[key] = np.array(val.cpu())[0]
+  predicted_objects = attribute_lists_to_objects(detection_attributes)
+  if len(predicted_objects) < 1:
+    return stats, None, None
+  images, bev, predictions, ground_truths = draw_results(
+    [np.array(image.cpu())[0]], [calib], 
+    predicted_objects, annotated_objects
+  )
+
+  annotation_attributes = objects_to_attribute_list(ground_truths)
+  prediction_attributes = objects_to_attribute_list(predictions)
+  
+  prediction_attributes['dd_bb_image'] = np.squeeze(np.array(prediction_attributes['dd_bb_image']))
+  annotation_attributes['dd_bb_image'] = np.squeeze(np.array(annotation_attributes['dd_bb_image']))
+  gt_idx, pred_idx, iou, label = match_bboxes(
+    np.array(annotation_attributes['dd_bb_image']), 
+    np.array(prediction_attributes['dd_bb_image'])
+  )
+
+  predicted_objects = [predicted_objects[i] for i, _ in predicted_objects.items()]
+  annotated_objects = [annotated_objects[i] for i, _ in annotated_objects.items()]
+
+  for i in range(len(gt_idx)):
+    matching_stats = compare_pred_gt(
+      predicted_objects[pred_idx[i]],
+      annotated_objects[gt_idx[i]]
+    )
+    matching_stats['2D_iou'] = iou[i]
+    stats[i] = matching_stats
+
+  # if opt.show_repro:
+  #   for image in images:
+      # cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+      # cv2.imshow("result", image)
+      # cv2.imshow("bev", bev)
+      # cv2.waitKey(0)
+
+  return stats, images, bev
+
+def compare_pred_gt(prediction, ground_truth):
+  stats = {}
+  for key, val in prediction.items():
+    if key in ground_truth:
+      if key == 'location':
+        stats[key] = np.linalg.norm(val - ground_truth[key])
+      elif key == 'size':
+        stats[key] = val - ground_truth[key]
+      elif key == 'rot':
+        stats[key] = abs((np.pi - abs(abs(val - ground_truth[key]) - np.pi)) * 180/np.pi)
+      elif key == 'ddd_bb_world':
+        stats['3D_iou'], stats['bev_iou'] = calculate_3D_iou(val, ground_truth[key])
+
+  return stats

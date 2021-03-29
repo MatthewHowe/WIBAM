@@ -555,10 +555,11 @@ class WIBAM_test(Dataset):
     for dirpath, dirnames, filenames in os.walk(self.labels_dir):
       if len(dirnames) == 0:
         cam = dirpath.split("/")[-1]
+        filenames = [int(x.split('.')[0]) for x in filenames]
+        filenames.sort()
         for filename in filenames:
-          img_num = filename.split(".")[0]
-          self.paths[idx] = {"image_path": os.path.join(self.images_dir, cam, img_num + ".jpg"),
-                             "label_path": os.path.join(dirpath, filename)}
+          self.paths[idx] = {"image_path": os.path.join(self.images_dir, cam, str(filename) + ".jpg"),
+                             "label_path": os.path.join(dirpath, str(filename) + ".json")}
           idx += 1
 
   def __getitem__(self, index):
@@ -566,17 +567,18 @@ class WIBAM_test(Dataset):
     image_num = image_path.split("/")[-1].split(".jpg")[0]
     cam_num = image_path.split("/")[-2]
     image = cv2.imread(image_path)
+    drawing_image = np.copy(image)
     center = np.array(
       [image.shape[1] / 2., image.shape[0] / 2.], dtype=np.float32
     )
     trans_input = get_affine_transform(
-      center , 1, 0, [self.opt.input_w, self.opt.input_h]
+      center , 1920, 0, [self.opt.input_w, self.opt.input_h]
     )
 
     image = self._get_input(image, trans_input)
     
     return {"image": image, "cam_num": cam_num, "image_num": image_num,
-            "index": index}
+            "index": index, "drawing_image": drawing_image}
 
   def _get_input(self, img, trans_input):
     inp = cv2.warpAffine(img, trans_input,
@@ -597,7 +599,7 @@ class WIBAM_test(Dataset):
       self.data_dir, "calib/calibration_{}.npz".format(cam)
     )
     calib = np.load(calib_dir)
-    return {"label": label, "calib": calib}
+    return label, calib
 
   def __len__(self):
     return len(self.paths)

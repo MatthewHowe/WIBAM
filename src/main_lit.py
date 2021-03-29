@@ -9,6 +9,8 @@ from pathlib import Path
 import fsspec
 import torch
 from torch import nn
+import cv2
+import numpy as np
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
@@ -23,7 +25,7 @@ from pytorch_lightning.overrides.data_parallel import LightningDistributedDataPa
 from torch.utils.tensorboard import SummaryWriter
 from opts import opts
 from model.model import create_model, load_model, save_model
-from utils.mv_utils import test_post_process
+from utils.mv_utils import test_post_process, compare_ground_truth
 from model.decode import generic_decode
 from utils.post_process import generic_post_process
 from utils.collate import default_collate, instance_batching_collate
@@ -174,9 +176,19 @@ class LitWIBAM(pl.LightningModule):
 		self.log("val_variance", variance, on_epoch=True)
 
 	def on_test_epoch_start(self):
-		# loss =
-		if self.opt.test:
-			self.results = {}
+
+		self.results = {}
+		if opt.save_video:
+			fourcc = cv2.VideoWriter_fourcc('F', 'M', 'P', '4')
+			self.ImageWriter = cv2.VideoWriter(
+				'image_out.avi', fourcc, 12, (1920,1080)
+			)
+			self.BevWriter = cv2.VideoWriter(
+				'bev_out.avi', fourcc, 12, (800,800)
+			)
+			self.JointWriter = cv2.VideoWriter(
+				'joint_out.avi', fourcc, 12, (3000, 1080)
+			)
 
 	def test_step(self, test_batch,  test_idx):
 		if self.opt.test:
@@ -206,15 +218,36 @@ class LitWIBAM(pl.LightningModule):
 			)
 		else:
 			out = self(test_batch['image'])[0]
-			anns = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
-			detections = test_post_process(out, anns["calib"])
-			for score in detections['scores'][0]:
-				if score > 0.8:
-					print("Good detection")
-
+			labels, calibration = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
+			detections = test_post_process(out, calibration)
+			performance_stats, images, bev = compare_ground_truth(
+				detections, labels, test_batch['drawing_image'], calibration, self.opt
+			)
+			for _, match in performance_stats.items():
+				for stat, val in match.items():
+					if stat in self.results:
+						self.results[stat].append(val)
+					else:
+						self.results[stat] = [val]
+			if images != None:
+				self.ImageWriter.write(images[0])
+				self.BevWriter.write(bev)
+				bev = cv2.resize(bev, (1080,1080), fx=0, fy=0, interpolation= cv2.INTER_CUBIC)
+				stack = np.hstack([images[0], bev])
+				self.JointWriter.write(stack)
 			return detections
 
 	def test_epoch_end(self, test_step_outputs):
+		np.printoptions(precision=2)
+		for stat, val in self.results.items():
+			if stat == 'size':
+				print(f"l,w,h Average: {np.mean(val[0]):.2f}, {np.mean(val[1]):.2f}, {np.mean(val[2]):.2f}")
+				continue
+			print(f"{stat} Average: {np.mean(val):.2f}, Variance: {np.var(val):.2f}")
+		self.ImageWriter.release()
+		self.BevWriter.release()
+		self.JointWriter.release()
+		cv2.destroyAllWindows()
 		print("FINISHED")
 
 if __name__ == '__main__':
@@ -226,15 +259,19 @@ if __name__ == '__main__':
 		print(gclout.isdir(opt.output_path))
 
 	model = LitWIBAM()
-	state_dict_ = torch.load(opt.load_model)['state_dict']
-	state_dict = {}
-	for k in state_dict_:
-		if k.startswith('module') and not k.startswith('module_list'):
-			state_dict[k[7:]] = state_dict_[k]
-		else:
-			state_dict[k] = state_dict_[k]
-	state_dict = {'model.'+str(key): val for key, val in state_dict.items()}
-	model.load_state_dict(state_dict)
+	if opt.load_model != '':
+		state_dict_ = torch.load(opt.load_model)['state_dict']
+		state_dict = {}
+		for k in state_dict_:
+			if k.startswith('module') and not k.startswith('module_list'):
+				state_dict[k[7:]] = state_dict_[k]
+			else:
+				state_dict[k] = state_dict_[k]
+			if not k.startswith('model'):
+				state_dict['model.' + k] = state_dict[k]
+				del state_dict[k]
+
+		model.load_state_dict(state_dict)
 
 	checkpoint_callback = ModelCheckpoint(
 		monitor="val_main_tot", save_last=True, 

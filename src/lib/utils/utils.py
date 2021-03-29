@@ -76,3 +76,34 @@ def separate_batches(output, batch_size):
             ret[batch][key] = val[batch].to('cpu')
 
     return ret
+
+def attribute_lists_to_objects(detections, detection_thresh=0.4):
+    objects = {}
+    max_objects = detections['scores'].size
+    for obj in range(max_objects):
+        if detections['scores'][obj] < detection_thresh:
+            continue
+        attributes = {}
+        attributes['location'] = detections['location_wcf'][obj]
+        size = detections['size'][obj]
+        size[0], size[2] = size[2], size[0]
+        attributes['location'][2] = attributes['location'][2] - size[2]/2
+        attributes['size'] = size
+        attributes['rot'] = detections['rot'][obj]
+
+        objects[obj] = attributes
+
+    return objects
+
+def objects_to_attribute_list(objects):
+    attributes = {}
+    if isinstance(objects, list):
+        objects = {i:objects[i] for i in range(len(objects))}
+    for obj, obj_attributes in objects.items():
+        for key, val in obj_attributes.items():
+            if key in attributes:
+                attributes[key].append(val)
+            else:
+                attributes[key] = [val]
+
+    return attributes
