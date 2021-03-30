@@ -227,7 +227,7 @@ class ReprojectionLoss(nn.Module):
 
     self.profiler.interval_trigger("Constructing boxes")
 
-    mv_loss = {'tot': 0}
+    mv_loss = {}
     for key, val in gt_dict.items():
       gt_boxes = torch.stack(val, 0)
       pr_boxes = torch.stack(pr_dict[key], 0)
@@ -236,21 +236,20 @@ class ReprojectionLoss(nn.Module):
       if key == 'det' and self.opt.no_det:
         continue
       elif key == 'det' and self.opt.det_only:
-        mv_loss['tot'] += loss
+        self.add_to_total_loss(mv_loss, loss)
         break
       elif not self.opt.det_only:
-        mv_loss['tot'] += loss
+        self.add_to_total_loss(mv_loss, loss)
 
     self.profiler.interval_trigger("Calculating loss")  
 
     # Make sure that number of detections is equal to number of gt detections
     if 'det' in pr_dict:  
       mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
-      1
     else:
       mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
-    mv_loss['tot_GIoU'] = mv_loss['tot']
-    mv_loss['tot'] = mv_loss['tot'] * mv_loss['mult']
+    # mv_loss['tot_GIoU'] = mv_loss['tot']
+    self.add_to_total_loss(mv_loss, mv_loss['mult'])
     
     self.profiler.interval_trigger("Multipling loss")
 
@@ -265,5 +264,8 @@ class ReprojectionLoss(nn.Module):
     # self.profiler.print_interval_times()
     return mv_loss
 
-def test_accuracy(detections, annotations, opt):
-  ground_plane_boxes() 
+  def add_to_total_loss(self, losses, loss):
+    if 'tot' in losses:
+      losses['tot'] += loss
+    else:
+      losses['tot'] = loss
