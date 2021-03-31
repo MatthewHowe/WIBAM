@@ -61,16 +61,18 @@ class WIBAM(GenericDataset):
     img_dir = os.path.join(data_dir, 'frames')
     # Where instance sets are kept
     split_dir = os.path.join(data_dir, 'image_sets')
-    self.instances = []
-    # Count the number of lines in the image set, which indicates time instances
+    
     with open(os.path.join(split_dir, '{}.txt'.format(split))) as image_set:
-      for line in image_set:
-        self.instances.append(int(line))
+      self.instances = [int(line) for line in image_set]
+
+    if split == 'train':
+      limit = int(opt.trainset_percentage * len(self.instances))
+      self.instances = self.instances[:limit]
 
     # Get annotation path
     if opt.dataset_version == '':
       ann_path = os.path.join(data_dir,
-        'annotations', 'wibam_{}.json').format(split, opt.dataset_version)
+        'annotations', 'wibam_all.json').format(split, opt.dataset_version)
     else:
       ann_path = os.path.join(data_dir,
         'annotations', 'wibam_{}_{}.json').format(split, opt.dataset_version) 
@@ -87,11 +89,6 @@ class WIBAM(GenericDataset):
     else:
       self.instance_batching = False
       self.num_samples = len(self.images)
-
-    # print('[INFO] Loaded {} split with {} images and {} instances'.format( \
-    #       split, len(self.images), len(self.instances)))
-    # print("[INFO] Loading with instance_batching: {} in {} samples".format( \
-    #       self.opt.instance_batching, self.num_samples))
 
   # Override functions
   # Called to load image and annotations, option to do all instances at time
@@ -391,7 +388,8 @@ class WIBAM(GenericDataset):
     if self.instance_batching:
       id = self.instances[index]
     else:
-      id = self.images[index]
+      # id = self.images[index]
+      id = self.instances[index]
     img, cams, anns, img_info, img_path, drawing_images = self._load_image_anns(id, self.coco, self.img_dir)
 
     return img, cams, anns, img_info, img_path, drawing_images
@@ -462,14 +460,10 @@ class WIBAM(GenericDataset):
         imgs_anns.append(anns)
         imgs_info.append(img_info)
 
-      
-
-    # Return results
     return imgs, cam_nums, imgs_anns, imgs_info, imgs_path, drawing_images
 
-  # Dataloader uses this function to create the iterable dataset
   def __len__(self):
-    return self.num_samples
+    return len(self.instances)
 
   def _to_float(self, x):
     return float("{:.2f}".format(x))

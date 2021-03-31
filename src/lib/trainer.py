@@ -156,7 +156,7 @@ class MultiviewLoss(torch.nn.Module):
 
       # Reprojection loss
       mv_loss = self.ReprojectionLoss(output,batch)
-      if 'tot' not in mv_loss:
+      if 'tot' in mv_loss:
         losses['mv'] += mv_loss['tot']
 
       for key, val in losses.items():

@@ -293,7 +293,8 @@ if __name__ == '__main__':
 						 default_root_dir=opt.output_path, 
 						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=1,
-						 plugins=[my_ddp]
+						 plugins=[my_ddp],
+						 max_epochs=50
 						 )
 
 	# trainer.test(model)
