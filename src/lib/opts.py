@@ -269,6 +269,8 @@ class opts(object):
     self.parser.add_argument('--velocity', action='store_true')
     self.parser.add_argument('--velocity_weight', type=float, default=1)
     self.parser.add_argument('--mv_weight', type=float, default=1)
+    self.parser.add_argument('--reprojection_loss_function', default='giou',
+                             help='Use giou, diou, or ciou?')
     
     # Multi-view
     # self.parser.add_argument('--giou_thresh', type=float, default=-0.5,

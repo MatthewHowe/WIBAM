@@ -624,8 +624,8 @@ def compare_ground_truth(detection_attributes, annotated_objects, image, calib, 
   annotation_attributes = objects_to_attribute_list(ground_truths)
   prediction_attributes = objects_to_attribute_list(predictions)
   
-  prediction_attributes['dd_bb_image'] = np.squeeze(np.array(prediction_attributes['dd_bb_image']))
-  annotation_attributes['dd_bb_image'] = np.squeeze(np.array(annotation_attributes['dd_bb_image']))
+  prediction_attributes['dd_bb_image'] = np.squeeze(np.array(prediction_attributes['dd_bb_image']), -2)
+  annotation_attributes['dd_bb_image'] = np.squeeze(np.array(annotation_attributes['dd_bb_image']), -2)
   gt_idx, pred_idx, iou, label = match_bboxes(
     np.array(annotation_attributes['dd_bb_image']), 
     np.array(prediction_attributes['dd_bb_image'])

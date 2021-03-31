@@ -33,7 +33,7 @@ def generate_colors(n):
     rgb_01.append((r/256,g/256,b/256))
   return rgb_values, rgb_01, hex_values 
 
-def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
+def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean', loss_function='giou'):
   r"""
   GIoU function, takes in ground truth bounding boxes and predicted
   bounding boxes. Uses BB[min_x,min_y,max_x,max_y]
@@ -76,9 +76,21 @@ def generalized_iou_loss(gt_bboxes, pr_bboxes, reduction='mean'):
   bottom_right = torch.max(gt_bboxes[:, 2:], pr_bboxes[:, 2:])
   wh = (bottom_right - top_left + TO_REMOVE).clamp(min=0)
   enclosure = wh[:, 0] * wh[:, 1]
+  
+  # distance
+  gt_centers = (gt_bboxes[:, :2] + gt_bboxes[:, 2:]) / 2
+  pr_centers = (pr_bboxes[:, :2] + pr_bboxes[:, 2:]) / 2
+  center_dists = torch.diagonal(torch.cdist(gt_centers, pr_centers), 0)
+  enclosure_diag_lengths = torch.diagonal(torch.cdist(top_left, bottom_right), 0)
 
+  diou = iou + torch.pow(center_dists, 2) / torch.pow(enclosure_diag_lengths, 2)
   giou = iou - (enclosure-union)/enclosure
-  loss = 1. - giou
+
+  if loss_function == 'giou':
+    loss = 1. - giou
+  elif loss_function == 'diou':
+    loss = 1. - diou
+
   if reduction == 'mean':
     loss = loss.mean()
   elif reduction == 'sum':
@@ -231,7 +243,7 @@ class ReprojectionLoss(nn.Module):
     for key, val in gt_dict.items():
       gt_boxes = torch.stack(val, 0)
       pr_boxes = torch.stack(pr_dict[key], 0)
-      loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean')
+      loss = generalized_iou_loss(gt_boxes, pr_boxes, 'mean', self.opt.reprojection_loss_function)
       mv_loss[key] = loss
       if key == 'det' and self.opt.no_det:
         continue
@@ -244,12 +256,12 @@ class ReprojectionLoss(nn.Module):
     self.profiler.interval_trigger("Calculating loss")  
 
     # Make sure that number of detections is equal to number of gt detections
-    if 'det' in pr_dict:  
-      mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
-    else:
-      mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
+    # if 'det' in pr_dict:  
+    #   mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - len(pr_dict['det'])),2) + 1.
+    # else:
+    #   mv_loss['mult'] = pow((torch.sum(batch['mask_det']) - 0),2) + 1.
     # mv_loss['tot_GIoU'] = mv_loss['tot']
-    self.add_to_total_loss(mv_loss, mv_loss['mult'])
+    # self.add_to_total_loss(mv_loss, mv_loss['mult'])
     
     self.profiler.interval_trigger("Multipling loss")
 
