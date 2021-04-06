@@ -297,5 +297,5 @@ if __name__ == '__main__':
 						 max_steps=6000
 						 )
 
-	trainer.test(model)
+	# trainer.test(model)
 	trainer.fit(model)
