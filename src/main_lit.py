@@ -294,8 +294,8 @@ if __name__ == '__main__':
 						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=1,
 						 plugins=[my_ddp],
-						 max_epochs=50
+						 max_steps=6000
 						 )
 
-	# trainer.test(model)
+	trainer.test(model)
 	trainer.fit(model)
