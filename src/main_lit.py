@@ -18,6 +18,7 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
 
 from pytorch_lightning.overrides.data_parallel import LightningDistributedDataParallel
@@ -277,7 +278,11 @@ if __name__ == '__main__':
 
 	checkpoint_callback = ModelCheckpoint(
 		monitor="val_main_tot", save_last=True, 
-		save_top_k=2, mode='min', period=2
+		save_top_k=3, mode='min', period=10
+	)
+
+	earlystop_callback = EarlyStopping(
+		monitor="val_tot", min_delta=.05, patience=5
 	)
 										  
 	class MyDDP(DDPPlugin):
@@ -289,10 +294,10 @@ if __name__ == '__main__':
 	my_ddp = MyDDP()
 
 	trainer = pl.Trainer(checkpoint_callback=True,
-						 callbacks=[checkpoint_callback],
+						 callbacks=[checkpoint_callback, earlystop_callback],
 						 default_root_dir=opt.output_path, 
 						 gpus=opt.gpus, accelerator="dp",
-						 check_val_every_n_epoch=1,
+						 check_val_every_n_epoch=2,
 						 plugins=[my_ddp],
 						 max_steps=6000
 						 )
