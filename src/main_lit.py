@@ -310,8 +310,8 @@ if __name__ == '__main__':
 						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=2,
 						 plugins=[my_ddp],
-						 max_steps=6000
+						 max_steps=10000
 						 )
 
-	# trainer.test(model)
+	trainer.test(model)
 	trainer.fit(model)
