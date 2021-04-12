@@ -5,6 +5,7 @@ from __future__ import print_function
 import _init_paths
 import os
 import math
+import copy
 from pathlib import Path
 import fsspec
 import torch
@@ -101,10 +102,10 @@ class LitWIBAM(pl.LightningModule):
 		return DataLoader
 
 	def configure_optimizers(self):
-		for name, param in self.model.named_parameters():
-			# Setting rotation to not change weights
-			if name.split(".")[0] == "rot":
-				param.requires_grad=False
+		# for name, param in self.model.named_parameters():
+		# 	# Setting rotation to not change weights
+		# 	if name.split(".")[0] == "rot":
+		# 		param.requires_grad=False
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
 		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 						optimizer, mode='min', factor=0.1, patience=2,
@@ -240,9 +241,19 @@ class LitWIBAM(pl.LightningModule):
 
 	def test_epoch_end(self, test_step_outputs):
 		np.printoptions(precision=2)
+		# with open("test_results.csv", "a+") as file:
+		# 	writer = csv.writer(file)
+		# 	heading ["experiment", ]
 		for stat, val in self.results.items():
 			if stat == 'size':
 				print(f"l,w,h Average: {np.mean(val[0]):.2f}, {np.mean(val[1]):.2f}, {np.mean(val[2]):.2f}")
+				continue
+			if stat == 'rot':
+				val = np.array(val)
+				aliased = copy.deepcopy(val[(val >= 90) | (val <= -90)])
+				val = val[(val <= 90) & (val >=-90)]
+				print(f"{stat} Average: {np.mean(val):.2f}, Variance: {np.var(val):.2f}")
+				print(f"{stat}_alias %: {aliased.size/(val.size + aliased.size)}")
 				continue
 			print(f"{stat} Average: {np.mean(val):.2f}, Variance: {np.var(val):.2f}")
 		self.ImageWriter.release()
@@ -250,7 +261,7 @@ class LitWIBAM(pl.LightningModule):
 		self.JointWriter.release()
 		cv2.destroyAllWindows()
 		print("FINISHED")
-
+  
 if __name__ == '__main__':
 
 	opt = opts().parse()
@@ -282,7 +293,7 @@ if __name__ == '__main__':
 	)
 
 	earlystop_callback = EarlyStopping(
-		monitor="val_tot", min_delta=.05, patience=5
+		monitor="val_tot", min_delta=.005, patience=5
 	)
 										  
 	class MyDDP(DDPPlugin):
