@@ -293,7 +293,7 @@ if __name__ == '__main__':
 	)
 
 	earlystop_callback = EarlyStopping(
-		monitor="val_tot", min_delta=.005, patience=5
+		monitor="val_tot", min_delta=.001, patience=5
 	)
 										  
 	class MyDDP(DDPPlugin):
@@ -313,5 +313,5 @@ if __name__ == '__main__':
 						 max_steps=10000
 						 )
 
-	trainer.test(model)
+	# trainer.test(model)
 	trainer.fit(model)
