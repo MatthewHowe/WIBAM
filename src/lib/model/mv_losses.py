@@ -141,7 +141,7 @@ class ReprojectionLoss(nn.Module):
     )
 
     # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30);
-    detections['depth'] = decoded_output['dep'] * 0.80
+    detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
     # detections['depth'] = decoded_output['dep']
     detections['size'] = decoded_output['dim']
     # Restrict size
