@@ -551,8 +551,12 @@ def test_post_process(model_output, calib):
     1920, (200,112), BN, max_objects
   )
   detections['scores'] = decoded_output['scores']
-  detections['depth'] = decoded_output['dep'] * 0.80
-  detections['size'] = decoded_output['dim'] 
+  # detections['depth'] = decoded_output['dep'] * 0.80
+  detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
+  detections['size'] = decoded_output['dim']
+  detections['size'][:, :, 0] = torch.sigmoid(detections['size'][:, :, 0] - 1.5) * 3 # h 0-3m
+  detections['size'][:, :, 1] = torch.sigmoid(detections['size'][:, :, 1] - 2) * 4 # w 0-4m
+  detections['size'][:, :, 2] = torch.sigmoid(detections['size'][:, :, 2] - 4.5) * 9 # l 0-9m
   detections['rot'] = decoded_output['rot']
   detections['center'] = centers_offset
 

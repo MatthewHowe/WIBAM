@@ -289,7 +289,7 @@ if __name__ == '__main__':
 
 	checkpoint_callback = ModelCheckpoint(
 		monitor="val_main_tot", save_last=True, 
-		save_top_k=3, mode='min', period=10
+		save_top_k=3, mode='min', period=5
 	)
 
 	earlystop_callback = EarlyStopping(
@@ -305,13 +305,12 @@ if __name__ == '__main__':
 	my_ddp = MyDDP()
 
 	trainer = pl.Trainer(checkpoint_callback=True,
-						 callbacks=[checkpoint_callback, earlystop_callback],
+						 callbacks=[checkpoint_callback],
 						 default_root_dir=opt.output_path, 
 						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=2,
-						 plugins=[my_ddp],
-						 max_steps=10000
+						 plugins=[my_ddp]
 						 )
 
-	# trainer.test(model)
-	trainer.fit(model)
+	trainer.test(model)
+	# trainer.fit(model)
