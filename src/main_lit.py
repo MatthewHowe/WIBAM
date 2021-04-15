@@ -293,7 +293,7 @@ if __name__ == '__main__':
 	)
 
 	earlystop_callback = EarlyStopping(
-		monitor="val_tot", min_delta=.001, patience=5
+		monitor="val_tot", min_delta=.001, patience=10
 	)
 										  
 	class MyDDP(DDPPlugin):
@@ -305,12 +305,12 @@ if __name__ == '__main__':
 	my_ddp = MyDDP()
 
 	trainer = pl.Trainer(checkpoint_callback=True,
-						 callbacks=[checkpoint_callback],
+						 callbacks=[checkpoint_callback, earlystop_callback],
 						 default_root_dir=opt.output_path, 
 						 gpus=opt.gpus, accelerator="dp",
 						 check_val_every_n_epoch=2,
 						 plugins=[my_ddp]
 						 )
 
-	trainer.test(model)
-	# trainer.fit(model)
+	# trainer.test(model)
+	trainer.fit(model)
