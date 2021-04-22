@@ -107,11 +107,12 @@ class LitWIBAM(pl.LightningModule):
 		# 	if name.split(".")[0] == "rot":
 		# 		param.requires_grad=False
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
-		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-						optimizer, mode='min', factor=0.1, patience=2,
-						threshold=0.001, verbose=True)
-		return {"optimizer": optimizer, "lr_scheduler": scheduler,
-				"monitor": "val_tot"}
+		# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+		# 				optimizer, mode='min', factor=0.1, patience=2,
+		# 				threshold=0.001, verbose=True)
+		# return {"optimizer": optimizer, "lr_scheduler": scheduler,
+		# 		"monitor": "val_tot"}
+		return optimizer
 
 	def training_step(self, train_batch, batch_idx):
 		if self.opt.mixed_dataset is not None:
