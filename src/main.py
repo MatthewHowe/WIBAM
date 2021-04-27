@@ -109,6 +109,17 @@ def main(opt):
     
     mark = epoch if opt.save_all else 'last'
     
+
+    
+    # Complete training step
+    log_dict_train, _ = trainer.train(epoch, train_loader)
+    logger.write('epoch: {} |'.format(epoch))
+
+    # Write log
+    for k, v in log_dict_train.items():
+      logger.scalar_summary('train_{}'.format(k), v, epoch)
+      logger.write('{} {:8f} | '.format(k, v))
+    
     # Validation
     if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)), 
@@ -124,16 +135,7 @@ def main(opt):
     else:
       save_model(os.path.join(opt.save_dir, 'model_last.pth'), 
                  epoch, model, optimizer)
-    
-    # Complete training step
-    log_dict_train, _ = trainer.train(epoch, train_loader)
-    logger.write('epoch: {} |'.format(epoch))
 
-    # Write log
-    for k, v in log_dict_train.items():
-      logger.scalar_summary('train_{}'.format(k), v, epoch)
-      logger.write('{} {:8f} | '.format(k, v))
-    
     logger.write('\n')
     if epoch in opt.save_point:
       save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)), 

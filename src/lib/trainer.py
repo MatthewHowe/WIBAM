@@ -46,7 +46,7 @@ class GenericLoss(torch.nn.Module):
     losses = {head: 0 for head in opt.heads}
 
 
-    output = outputs
+    output = outputs[0]
     output = self._sigmoid_output(output)
 
     # Heatmap loss
