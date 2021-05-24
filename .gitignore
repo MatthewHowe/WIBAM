@@ -5,6 +5,8 @@ centertrack_models/*
 */slurm-*.out
 src/slurm/
 results/*
+output/*
+datafraction_train
 # src/lib/models/networks/DCNv2
 src/lib/models/networks/DCNv2_04
 src/lib/models/networks/DCNv2_10
