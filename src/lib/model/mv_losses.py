@@ -141,13 +141,13 @@ class ReprojectionLoss(nn.Module):
     )
 
     # detections['depth'] = decoded_output['dep'] * (1266 * 64.57)/(1024 * 86.30);
-    detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
-    # detections['depth'] = decoded_output['dep']
+    # detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
+    detections['depth'] = decoded_output['dep'] * 0.8
     detections['size'] = decoded_output['dim']
     # Restrict size
-    detections['size'][:, :, 0] = torch.sigmoid(detections['size'][:, :, 0] - 1.5) * 3 # h 0-3m
-    detections['size'][:, :, 1] = torch.sigmoid(detections['size'][:, :, 1] - 2) * 4 # w 0-4m
-    detections['size'][:, :, 2] = torch.sigmoid(detections['size'][:, :, 2] - 4.5) * 9 # l 0-9m
+    # detections['size'][:, :, 0] = torch.sigmoid(detections['size'][:, :, 0] - 1.5) * 3 # h 0-3m
+    # detections['size'][:, :, 1] = torch.sigmoid(detections['size'][:, :, 1] - 2) * 4 # w 0-4m
+    # detections['size'][:, :, 2] = torch.sigmoid(detections['size'][:, :, 2] - 4.5) * 9 # l 0-9m
 
     detections['rot'] = decoded_output['rot']
     detections['center'] = centers_offset

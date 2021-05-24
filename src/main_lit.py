@@ -5,10 +5,12 @@ from __future__ import print_function
 import _init_paths
 import os
 import math
+import csv
 import copy
 from pathlib import Path
 import fsspec
 import torch
+torch.manual_seed(10)
 from torch import nn
 import cv2
 import numpy as np
@@ -108,7 +110,7 @@ class LitWIBAM(pl.LightningModule):
 		# 		param.requires_grad=False
 		optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr)
 		# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-		# 				optimizer, mode='min', factor=0.1, patience=2,
+		# 				optimizer, mode='min', factor=0.1, patience=4,
 		# 				threshold=0.001, verbose=True)
 		# return {"optimizer": optimizer, "lr_scheduler": scheduler,
 		# 		"monitor": "val_tot"}
@@ -179,8 +181,12 @@ class LitWIBAM(pl.LightningModule):
 		self.log("val_variance", variance, on_epoch=True)
 
 	def on_test_epoch_start(self):
-
+		self.count = 0
 		self.results = {}
+		model_name = self.opt.load_model.split("/")[-1].split(".")[0]
+		field_names = ['visibility', 'location', 'l', 'w', 'h', 'rot', '3D_iou', '2D_iou', 'bev_iou']
+		self.CSVWriter = csv.DictWriter(open(f"{model_name}.csv", "w"), fieldnames=field_names)
+		self.CSVWriter.writeheader()
 		if opt.save_video:
 			fourcc = cv2.VideoWriter_fourcc('F', 'M', 'P', '4')
 			self.ImageWriter = cv2.VideoWriter(
@@ -210,10 +216,6 @@ class LitWIBAM(pl.LightningModule):
 					test_batch['meta']['c'][i], test_batch['meta']['s'][i],
 					96, 320, 10, test_batch['meta']['calib'][i])
 			out = separate_batches(out, test_batch['image'].shape[0])
-			# self.test_dataloader.dataloader.dataset.save_mini_result(
-			# 	out, test_batch
-			# )
-			save_res = []
 			for i in range(len(out)):
 				self.results[test_batch['image_id'][i]] = out[i]
 			self.test_dataloader.dataloader.dataset.save_mini_result(
@@ -221,38 +223,44 @@ class LitWIBAM(pl.LightningModule):
 			)
 		else:
 			out = self(test_batch['image'])[0]
-			labels, calibration = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
+			labels, calibration, cam = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
 			detections = test_post_process(out, calibration)
-			performance_stats, images, bev = compare_ground_truth(
-				detections, labels, test_batch['drawing_image'], calibration, self.opt
-			)
-			for _, match in performance_stats.items():
-				for stat, val in match.items():
-					if stat in self.results:
-						self.results[stat].append(val)
-					else:
-						self.results[stat] = [val]
-			if images != None:
-				self.ImageWriter.write(images[0])
-				self.BevWriter.write(bev)
-				bev = cv2.resize(bev, (1080,1080), fx=0, fy=0, interpolation= cv2.INTER_CUBIC)
-				stack = np.hstack([images[0], bev])
-				self.JointWriter.write(stack)
+			if self.count % 7 == 0 and self.count >=(1*49) + 1 and self.count< 2*49:
+
+				performance_stats, images, bev = compare_ground_truth(
+					detections, labels, test_batch['drawing_image'], calibration, cam, self.opt
+				)
+				for _, match in performance_stats.items():
+					self.CSVWriter.writerows([match])
+					for stat, val in match.items():
+						if stat in self.results:
+							self.results[stat].append(val)
+						else:
+							self.results[stat] = [val]
+				if images != None:
+					self.ImageWriter.write(images[0])
+					self.BevWriter.write(bev)
+					bev = cv2.resize(bev, (1080,1080), fx=0, fy=0, interpolation= cv2.INTER_CUBIC)
+					stack = np.hstack([images[0], bev])
+					self.JointWriter.write(stack)
+			self.count += 1
 			return detections
 
 	def test_epoch_end(self, test_step_outputs):
 		np.printoptions(precision=2)
-		# with open("test_results.csv", "a+") as file:
+		# model_name = self.opt.load_model.split("/")[-1].split(".")[:1]
+		# with open(f"{model_name}.csv", "w") as file:
 		# 	writer = csv.writer(file)
-		# 	heading ["experiment", ]
+		# 	for key, val in self.results.items():
+
 		for stat, val in self.results.items():
 			if stat == 'size':
 				print(f"l,w,h Average: {np.mean(val[0]):.2f}, {np.mean(val[1]):.2f}, {np.mean(val[2]):.2f}")
 				continue
 			if stat == 'rot':
 				val = np.array(val)
-				aliased = copy.deepcopy(val[(val >= 90) | (val <= -90)])
-				val = val[(val <= 90) & (val >=-90)]
+				aliased = copy.deepcopy(val[(val >= 150) | (val <= -150)])
+				val = val[(val <= 150) & (val >=-150)]
 				print(f"{stat} Average: {np.mean(val):.2f}, Variance: {np.var(val):.2f}")
 				print(f"{stat}_alias %: {aliased.size/(val.size + aliased.size)}")
 				continue
@@ -260,6 +268,7 @@ class LitWIBAM(pl.LightningModule):
 		self.ImageWriter.release()
 		self.BevWriter.release()
 		self.JointWriter.release()
+		# self.CSVWriter.close()
 		cv2.destroyAllWindows()
 		print("FINISHED")
   

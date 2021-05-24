@@ -32,7 +32,7 @@ class Ui_MainWindow(object):
         self.hand_labels = "data/wibam/annotations/hand_labels/"
         self.auto_labels = "data/wibam/annotations"
         self.image_extension = ".jpg"
-        self.image_idx = 0
+        self.image_idx = 600
         self.image_id = '0'
         self.calib = None
         self.current_images = []
@@ -181,6 +181,7 @@ class Ui_MainWindow(object):
         self.estimateLabelButton = QtWidgets.QPushButton(self.centralwidget)
         self.estimateLabelButton.setGeometry(QtCore.QRect(350, 30, 89, 25))
         self.estimateLabelButton.setObjectName("estimateLabelButton")
+        # self.fileNameLabel = QtWidgets.QTextEdit(self.centralwidget)
         self.fileNameLabel = QtWidgets.QLabel(self.centralwidget)
         self.fileNameLabel.setGeometry(QtCore.QRect(150, 90, 67, 17))
         self.fileNameLabel.setObjectName("fileNameLabel")

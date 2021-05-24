@@ -1,15 +1,18 @@
 # Multi-view utilities file
+from os import stat
+from numpy.lib.type_check import imag
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import torch.nn as nn
 from model.utils import _sigmoid
 from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
-from utils.drawing_utils import draw_results
+from utils.drawing_utils import draw_results, draw_birds_eye, initialise_birds_eye_image
 from utils.utils import attribute_lists_to_objects, objects_to_attribute_list
 from GUI.utils import draw_3D_labels
 from utils.bbox_iou_evaluation import match_bboxes, bbox_iou, calculate_3D_iou
 import torch
 import math
+import copy
 import time
 import cv2
 
@@ -551,12 +554,12 @@ def test_post_process(model_output, calib):
     1920, (200,112), BN, max_objects
   )
   detections['scores'] = decoded_output['scores']
-  # detections['depth'] = decoded_output['dep'] * 0.80
-  detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
+  detections['depth'] = decoded_output['dep'] * 0.8 # * (1266 * 64.57)/(1024 * 86.30)
+  # detections['depth'] = torch.sigmoid((decoded_output['dep'] * 0.80 - 30) / 10) * 60
   detections['size'] = decoded_output['dim']
-  detections['size'][:, :, 0] = torch.sigmoid(detections['size'][:, :, 0] - 1.5) * 3 # h 0-3m
-  detections['size'][:, :, 1] = torch.sigmoid(detections['size'][:, :, 1] - 2) * 4 # w 0-4m
-  detections['size'][:, :, 2] = torch.sigmoid(detections['size'][:, :, 2] - 4.5) * 9 # l 0-9m
+  # detections['size'][:, :, 0] = torch.sigmoid(detections['size'][:, :, 0] - 1.5) * 3 # h 0-3m
+  # detections['size'][:, :, 1] = torch.sigmoid(detections['size'][:, :, 1] - 2) * 4 # w 0-4m
+  # detections['size'][:, :, 2] = torch.sigmoid(detections['size'][:, :, 2] - 4.5) * 9 # l 0-9m
   detections['rot'] = decoded_output['rot']
   detections['center'] = centers_offset
 
@@ -612,12 +615,27 @@ def _sigmoid_output(output):
       output['dep'] = 1. / (output['dep'].sigmoid() + 1e-6) - 1.
     return output
 
-def compare_ground_truth(detection_attributes, annotated_objects, image, calib, opt):
+
+over = True
+BEV_image = copy.deepcopy(initialise_birds_eye_image())
+if over:
+  BEV_image['image'] = cv2.imread("output/restrictedBEV_1_123_prewib_ALT.png")
+
+def compare_ground_truth(detection_attributes, annotated_objects, image, calib, cam, opt):
+  cv2.imshow("plain", np.array(image.cpu())[0])
+  cv2.waitKey(0)
   max_objects = 50
   stats = {}
   for key, val in detection_attributes.items():
     detection_attributes[key] = np.array(val.cpu())[0]
   predicted_objects = attribute_lists_to_objects(detection_attributes)
+  predicted_objects_n = {}
+
+  
+  for key, val in predicted_objects.items():
+    if not np.max(val['size']) > 6:
+      predicted_objects_n[key] = val
+  predicted_objects = predicted_objects_n
   if len(predicted_objects) < 1:
     return stats, None, None
   images, bev, predictions, ground_truths = draw_results(
@@ -638,10 +656,21 @@ def compare_ground_truth(detection_attributes, annotated_objects, image, calib, 
   predicted_objects = [predicted_objects[i] for i, _ in predicted_objects.items()]
   annotated_objects = [annotated_objects[i] for i, _ in annotated_objects.items()]
 
+  colour = [73,136,255] # ORANGE
+  if not over:
+    colour = [228,183,61] # BLUE
+
   for i in range(len(gt_idx)):
+    draw_idx = [0,1,2]
+    if gt_idx[i] not in draw_idx:
+      continue
+    if not over:
+      draw_birds_eye(ground_truths[gt_idx[i]], BEV_image, tuple([40,190,105]))
+    draw_birds_eye(predictions[pred_idx[i]], BEV_image, tuple(colour))
     matching_stats = compare_pred_gt(
       predicted_objects[pred_idx[i]],
-      annotated_objects[gt_idx[i]]
+      annotated_objects[gt_idx[i]],
+      cam
     )
     matching_stats['2D_iou'] = iou[i]
     stats[i] = matching_stats
@@ -651,20 +680,24 @@ def compare_ground_truth(detection_attributes, annotated_objects, image, calib, 
       cv2.namedWindow("result", cv2.WINDOW_NORMAL)
       cv2.imshow("result", image)
       cv2.imshow("bev", bev)
+      cv2.imshow("restrictedBEV", BEV_image['image'])
       cv2.waitKey(0)
 
   return stats, images, bev
 
-def compare_pred_gt(prediction, ground_truth):
+def compare_pred_gt(prediction, ground_truth, cam):
   stats = {}
+  stats['visibility'] = ground_truth['visibility'][cam]
   for key, val in prediction.items():
     if key in ground_truth:
       if key == 'location':
         stats[key] = np.linalg.norm(val - ground_truth[key])
       elif key == 'size':
-        stats[key] = val - ground_truth[key]
+        error = val - ground_truth[key]
+        # stats[key] = val - ground_truth[key]
+        stats['l'], stats['w'], stats['h'] = error[0], error[1], error[2]
       elif key == 'rot':
-        stats[key] = abs((np.pi - abs(abs(val - ground_truth[key]) - np.pi)) * 180/np.pi)
+        stats[key] = abs(((((val - ground_truth[key])*180/math.pi)+180) % 360) - 180)
       elif key == 'ddd_bb_world':
         stats['3D_iou'], stats['bev_iou'] = calculate_3D_iou(val, ground_truth[key])
 

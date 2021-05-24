@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import cv2
 
 def draw_results(images, calibrations, predictions=[], ground_truths=[],
@@ -6,15 +7,9 @@ def draw_results(images, calibrations, predictions=[], ground_truths=[],
                  draw=['ddd_boxes', 'birds_eye', 'dd_boxes', 'gt']):
 
     if isinstance(predictions, dict):
-        temp = []
-        for key, val in predictions.items():
-            temp.append(val)
-        predictions = temp
+        predictions = dict_to_list(predictions)
     if isinstance(ground_truths, dict):
-        temp = []
-        for key, val in ground_truths.items():
-            temp.append(val)
-        ground_truths = temp
+        ground_truths = dict_to_list(ground_truths)
 
     if 'birds_eye' in draw and birds_eye is None:
         birds_eye = initialise_birds_eye_image()
@@ -31,17 +26,26 @@ def draw_results(images, calibrations, predictions=[], ground_truths=[],
 
     return images, birds_eye['image'], predictions, ground_truths
 
-def initialise_birds_eye_image():
-    meter_bounds = np.array([[-20,-20], [60,60]])
-    scale = 10 # pixes/meter
-    offset = abs(np.min(meter_bounds))
+BEV_image = cv2.imread("data/wibam/cleanBEV.png")
+
+def dict_to_list(dict):
+    temp = []
+    for key, val in dict.items():
+        temp.append(val)
+    return temp
+
+def initialise_birds_eye_image(path=None):
+    meter_bounds = np.array([[20,-5], [40,40]])
+    scale = 17.45 # pixes/meter
+    offset = np.array([3,-2]) # ()
     pixel_bounds = (meter_bounds + offset) * scale
-    image = np.zeros((np.max(pixel_bounds[:,0]), np.max(pixel_bounds[:,1]), 3), dtype=np.uint8)
-    return {'image': image, 'scale': scale, 'offset': offset, 'bounds': meter_bounds}
+    # image = np.zeros((np.max(pixel_bounds[:,0]), np.max(pixel_bounds[:,1]), 3), dtype=np.uint8)
+    # image = cv2.imread("data/wibam/cleanBEV.png")
+    return {'image': BEV_image, 'scale': scale, 'offset': offset, 'bounds': meter_bounds}
 
 def get_colours(number_pr, number_gt, colour_format='red-green', matches=[]):
     if colour_format == 'unique':
-        pr_colours, _, _ = generate_colors(number_objects)
+        pr_colours, _, _ = generate_colors(number_pr)
         gt_colours = [(0,0,0)]*number_pr
         for match in matches:
             gt_colours[match[1]] = pr_colours[match[0]]
@@ -82,7 +86,7 @@ def draw_object(obj, images, calibrations, draw, colour, birds_eye):
     if 'dd_boxes' in draw and ('dd_bb_image' in obj or 'ddd_bb_world' in obj):
         if 'dd_bb_image' not in obj:
             obj['dd_bb_image'] = get_dd_bb_image(obj['ddd_bb_image'])
-        draw_dd_box(obj['dd_bb_image'], images, colour)
+        # draw_dd_box(obj['dd_bb_image'], images, colour)
 
     if 'birds_eye' in draw and 'location' in obj:
         if 'ddd_bb_world' not in obj:
@@ -152,7 +156,7 @@ def draw_ddd_box(image_points, images, colour=(255,0,0), same_color=True):
                         [2, 3, 7, 6]] #RRB, RLB, RLT, RRT
         right_corners = face_indices[1] if not same_color else []
         left_corners = face_indices[2] if not same_color else []
-        thickness = 2
+        thickness = 4
         corners = corners.astype(np.int32)
         for face_index in range(3, -1, -1):
             face = face_indices[face_index]
@@ -184,6 +188,7 @@ def draw_dd_box(dd_bb, images, colour=(255,0,0)):
         )
 
 def draw_birds_eye(obj, birds_eye, colour=(0, 255, 0)):
+    overlay = birds_eye['image'].copy()
     ground_point = obj['location'][:2]
     ddd_bb_bev = (obj['ddd_bb_world'][:4,:2] + birds_eye['offset']) * birds_eye['scale']
     arrow = np.array([
@@ -194,7 +199,13 @@ def draw_birds_eye(obj, birds_eye, colour=(0, 255, 0)):
     ddd_bb_bev = ddd_bb_bev.reshape((-1, 1, 2)).astype(int)
     arrow = arrow.reshape((-1, 1, 2)).astype(int)
     bev_point = tuple(((ground_point + birds_eye['offset']) * birds_eye['scale']).astype(int))
-    cv2.circle(birds_eye['image'], bev_point, 2, colour, -1)
+    cv2.circle(overlay, bev_point, 2, colour, -1)
+    cv2.fillPoly(
+        overlay, [ddd_bb_bev], colour, 1
+    )
+
+    alpha = 0.6
+    cv2.addWeighted(overlay, alpha, birds_eye['image'], 1-alpha, 0, birds_eye['image'])
     cv2.polylines(
         birds_eye['image'], [ddd_bb_bev,arrow], True, colour, 1
     )

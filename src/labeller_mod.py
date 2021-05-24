@@ -34,7 +34,7 @@ class Ui_MainWindow(object):
         self.hand_labels = "data/wibam/annotations/hand_labels/"
         self.auto_labels = "data/wibam/annotations/wibam_val.json"
         self.image_extension = ".jpg"
-        self.image_idx = 0
+        self.image_idx = 4964
         self.image_id = '0'
         self.calib = None
         self.current_images = []
@@ -425,7 +425,7 @@ class Ui_MainWindow(object):
 
     def next_image(self):
         if self.image_idx < len(self.image_list)-2:
-            self.image_idx += 1
+            self.image_idx += 4
         self.update_current_images()
         self.change_cam()
         self.imageSpinBox.setMaximum(len(self.drawnon_images)-1)
@@ -434,7 +434,7 @@ class Ui_MainWindow(object):
 
     def previous_image(self):
         if self.image_idx > 0:
-            self.image_idx -= 1
+            self.image_idx -= 4
         
         self.image_id = self.image_list[self.image_idx]
         self.update_current_images()

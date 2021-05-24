@@ -593,7 +593,7 @@ class WIBAM_test(Dataset):
       self.data_dir, "calib/calibration_{}.npz".format(cam)
     )
     calib = np.load(calib_dir)
-    return label, calib
+    return label, calib, int(cam)
 
   def __len__(self):
     return len(self.paths)
