@@ -19,7 +19,7 @@ To fine-tune the monocular 3D object detector, our method utilises multiple 2D d
 Our method achieves vehicle 7DoF pose prediction accuracy on our dataset comparable to the top performing monocular 3D object detectors on autonomous vehicle datasets. We present our training methodology, multi-view reprojection loss, and dataset.
 
 ## Required hardware
-Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 4 Nvidia V100s. (80GB VRAM required).
+Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
 
 ## Installation and setup
 
