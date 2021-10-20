@@ -9,6 +9,7 @@ The full paper is available [here]().
 
 3D object detector trained on NuScenes only.
 ![3D object detector trained on NuScenes only](examples/baseline.gif)
+
 3D object detector finetuned on the WIBAM dataset.
 ![3D object detector finetuned on the WIBAM dataset](examples/WIBAM.gif)
 
