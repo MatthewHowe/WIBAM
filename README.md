@@ -8,9 +8,11 @@ In: Britich Machine Vision Conference (BMVC) 2021
 The full paper is available [here]().
 
 3D object detector trained on NuScenes only.
+
 ![3D object detector trained on NuScenes only](examples/baseline.gif)
 
 3D object detector finetuned on the WIBAM dataset.
+
 ![3D object detector finetuned on the WIBAM dataset](examples/WIBAM.gif)
 
 Accurate 7DoF prediction of vehicles at an intersection is an important task for assessing potential conflicts between road users. In principle, this could be achieved by a single camera system that is capable of detecting the pose of each vehicle but this would require a large, accurately labelled dataset from which to train the detector. Although large vehicle pose datasets exist (ostensibly developed for autonomous vehicles), we find training on these datasets inadequate. These datasets contain images from a ground level viewpoint, whereas an ideal view for intersection observation would be elevated higher above the road surface. 
