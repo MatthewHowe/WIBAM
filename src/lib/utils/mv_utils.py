@@ -1,4 +1,5 @@
 # Multi-view utilities file
+from operator import gt
 from os import stat
 from numpy.lib.type_check import imag
 from scipy.optimize import linear_sum_assignment
@@ -6,7 +7,7 @@ import numpy as np
 import torch.nn as nn
 from model.utils import _sigmoid
 from utils.ddd_utils import draw_box_3d, ddd2locrot, project_3d_bbox, ddd2locrot
-from utils.drawing_utils import draw_results, draw_birds_eye, initialise_birds_eye_image
+from utils.drawing_utils import BEV_image, draw_results, draw_birds_eye, initialise_birds_eye_image
 from utils.utils import attribute_lists_to_objects, objects_to_attribute_list
 from GUI.utils import draw_3D_labels
 from utils.bbox_iou_evaluation import match_bboxes, bbox_iou, calculate_3D_iou
@@ -616,21 +617,21 @@ def _sigmoid_output(output):
     return output
 
 
-over = True
-BEV_image = copy.deepcopy(initialise_birds_eye_image())
-if over:
-  BEV_image['image'] = cv2.imread("output/restrictedBEV_1_123_prewib_ALT.png")
+over = False
+# BEV_image = copy.deepcopy(initialise_birds_eye_image())
+# if over:
+#   BEV_image['image'] = cv2.imread("output/restrictedBEV_1_123_prewib_ALT.png")
 
 def compare_ground_truth(detection_attributes, annotated_objects, image, calib, cam, opt):
-  cv2.imshow("plain", np.array(image.cpu())[0])
-  cv2.waitKey(0)
+  # cv2.imshow("plain", np.array(image.cpu())[0])
+  # cv2.waitKey(0)
   max_objects = 50
   stats = {}
   for key, val in detection_attributes.items():
     detection_attributes[key] = np.array(val.cpu())[0]
   predicted_objects = attribute_lists_to_objects(detection_attributes)
   predicted_objects_n = {}
-
+  BEV_image = initialise_birds_eye_image()
   
   for key, val in predicted_objects.items():
     if not np.max(val['size']) > 6:
@@ -691,11 +692,19 @@ def compare_pred_gt(prediction, ground_truth, cam):
   for key, val in prediction.items():
     if key in ground_truth:
       if key == 'location':
-        stats[key] = np.linalg.norm(val - ground_truth[key])
+        stats[key] = np.linalg.norm(val[:2] - ground_truth[key][:2])
       elif key == 'size':
         error = val - ground_truth[key]
+        val_area = val[0] * val[1]
+        gt_area = ground_truth[key][0] * ground_truth[key][1]
         # stats[key] = val - ground_truth[key]
         stats['l'], stats['w'], stats['h'] = error[0], error[1], error[2]
+        
+        pr_vol = val[0] * val[1] * val[2]
+        gt_vol = ground_truth[key][0] * ground_truth[key][1] * ground_truth[key][2]
+        stats['volume'] = (pr_vol-gt_vol)/gt_vol
+        stats['area'] = (val_area-gt_area)/gt_area
+        stats['scale'] = min(val_area, gt_area) / max(val_area, gt_area)
       elif key == 'rot':
         stats[key] = abs(((((val - ground_truth[key])*180/math.pi)+180) % 360) - 180)
       elif key == 'ddd_bb_world':

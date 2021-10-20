@@ -34,7 +34,7 @@ class Ui_MainWindow(object):
         self.hand_labels = "data/wibam/annotations/hand_labels/"
         self.auto_labels = "data/wibam/annotations/wibam_val.json"
         self.image_extension = ".jpg"
-        self.image_idx = 4964
+        self.image_idx = 6620
         self.image_id = '0'
         self.calib = None
         self.current_images = []
@@ -584,7 +584,7 @@ class Ui_MainWindow(object):
 
     def init_labels(self):
         file_name = self.hand_labels + self.image_id + ".json"
-        prev_id = self.image_list[self.image_idx-1]
+        prev_id = self.image_list[self.image_idx-4]
         prev_file_name = self.hand_labels + prev_id + ".json"
         if os.path.exists(file_name):
             with open(file_name, "r") as file:

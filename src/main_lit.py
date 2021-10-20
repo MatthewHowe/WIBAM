@@ -87,14 +87,16 @@ class LitWIBAM(pl.LightningModule):
 		else:
 			DataLoader = torch.utils.data.DataLoader(
 				get_dataset(self.opt.dataset)(self.opt, 'val'), 
-				batch_size=self.opt.batch_size * 2,
+				batch_size=self.opt.batch_size,
 				num_workers=self.opt.num_workers, 
-				drop_last=True, shuffle=False
+				drop_last=True, shuffle=True
 			)
 
 		return DataLoader
 
 	def test_dataloader(self):
+		if self.opt.validate:
+			return self.val_dataloader()
 		DataLoader = torch.utils.data.DataLoader(
 			WIBAM_test(self.opt),
 			batch_size=1,
@@ -184,8 +186,8 @@ class LitWIBAM(pl.LightningModule):
 		self.count = 0
 		self.results = {}
 		model_name = self.opt.load_model.split("/")[-1].split(".")[0]
-		field_names = ['visibility', 'location', 'l', 'w', 'h', 'rot', '3D_iou', '2D_iou', 'bev_iou']
-		self.CSVWriter = csv.DictWriter(open(f"{model_name}.csv", "w"), fieldnames=field_names)
+		field_names = ['visibility', 'location', 'l', 'w', 'h', 'rot', '3D_iou', '2D_iou', 'bev_iou', 'scale', 'volume', 'area']
+		self.CSVWriter = csv.DictWriter(open(f"csv_results/{model_name}.csv", "w"), fieldnames=field_names)
 		self.CSVWriter.writeheader()
 		if opt.save_video:
 			fourcc = cv2.VideoWriter_fourcc('F', 'M', 'P', '4')
@@ -195,11 +197,14 @@ class LitWIBAM(pl.LightningModule):
 			self.BevWriter = cv2.VideoWriter(
 				'bev_out.avi', fourcc, 12, (800,800)
 			)
+
 			self.JointWriter = cv2.VideoWriter(
-				'joint_out.avi', fourcc, 12, (3000, 1080)
+				'joint_out.avi', fourcc, 12, (1800, 648)
 			)
 
 	def test_step(self, test_batch,  test_idx):
+		if self.opt.validate:
+			return self.validation_step(test_batch, test_idx)
 		if self.opt.test:
 			out = self(test_batch['image'])[0]
 			for key, val in out.items():
@@ -225,28 +230,31 @@ class LitWIBAM(pl.LightningModule):
 			out = self(test_batch['image'])[0]
 			labels, calibration, cam = self.trainer.test_dataloaders[0].dataset.get_annotations(test_idx)
 			detections = test_post_process(out, calibration)
-			if self.count % 7 == 0 and self.count >=(1*49) + 1 and self.count< 2*49:
+			# if self.count % 7 == 0 and self.count >=(1*49) + 1 and self.count< 2*49:
 
-				performance_stats, images, bev = compare_ground_truth(
-					detections, labels, test_batch['drawing_image'], calibration, cam, self.opt
-				)
-				for _, match in performance_stats.items():
-					self.CSVWriter.writerows([match])
-					for stat, val in match.items():
-						if stat in self.results:
-							self.results[stat].append(val)
-						else:
-							self.results[stat] = [val]
-				if images != None:
-					self.ImageWriter.write(images[0])
-					self.BevWriter.write(bev)
-					bev = cv2.resize(bev, (1080,1080), fx=0, fy=0, interpolation= cv2.INTER_CUBIC)
-					stack = np.hstack([images[0], bev])
-					self.JointWriter.write(stack)
+			performance_stats, images, bev = compare_ground_truth(
+				detections, labels, test_batch['drawing_image'], calibration, cam, self.opt
+			)
+			for _, match in performance_stats.items():
+				self.CSVWriter.writerows([match])
+				for stat, val in match.items():
+					if stat in self.results:
+						self.results[stat].append(val)
+					else:
+						self.results[stat] = [val]
+			if images != None:
+				self.ImageWriter.write(images[0])
+				self.BevWriter.write(bev)
+				bev = cv2.resize(bev, (1080,1080), fx=0, fy=0, interpolation= cv2.INTER_CUBIC)
+				stack = np.hstack([images[0], bev])
+				stack = cv2.resize(stack, (1800,648), fx=0, fy=0, interpolation=cv2.INTER_CUBIC)
+				self.JointWriter.write(stack)
 			self.count += 1
 			return detections
 
 	def test_epoch_end(self, test_step_outputs):
+		if self.opt.validate:
+			return self.validation_epoch_end()
 		np.printoptions(precision=2)
 		# model_name = self.opt.load_model.split("/")[-1].split(".")[:1]
 		# with open(f"{model_name}.csv", "w") as file:

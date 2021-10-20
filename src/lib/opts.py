@@ -161,6 +161,7 @@ class opts(object):
                               help="Batchsize to load for the mixed dataloader")
 
     # test
+    self.parser.add_argument('--validate', action='store_true')
     self.parser.add_argument('--flip_test', action='store_true',
                              help='flip data augmentation.')
     self.parser.add_argument('--test_scales', type=str, default='1',

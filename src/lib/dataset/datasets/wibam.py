@@ -57,7 +57,7 @@ class WIBAM(GenericDataset):
   # Initialisation function
   def __init__(self, opt, split):
     # Define specific locations of dataset files
-    data_dir = os.path.join(opt.data_dir, 'wibam')
+    data_dir = os.path.join(opt.data_dir, 'wibam_published')
     img_dir = os.path.join(data_dir, 'frames')
     # Where instance sets are kept
     split_dir = os.path.join(data_dir, 'image_sets')
@@ -131,6 +131,7 @@ class WIBAM(GenericDataset):
 
       # initialise return variable
       ret = {'image': inp}
+      ret['image_info'] = imgs_info
       # Cam number for this image
       ret['cam_num'] = cam_num
       ret['drawing_images'] = np.array(drawing_images)

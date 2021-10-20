@@ -40,8 +40,8 @@ def initialise_birds_eye_image(path=None):
     offset = np.array([3,-2]) # ()
     pixel_bounds = (meter_bounds + offset) * scale
     # image = np.zeros((np.max(pixel_bounds[:,0]), np.max(pixel_bounds[:,1]), 3), dtype=np.uint8)
-    # image = cv2.imread("data/wibam/cleanBEV.png")
-    return {'image': BEV_image, 'scale': scale, 'offset': offset, 'bounds': meter_bounds}
+    image = cv2.imread("data/wibam/cleanBEV.png")
+    return {'image': image, 'scale': scale, 'offset': offset, 'bounds': meter_bounds}
 
 def get_colours(number_pr, number_gt, colour_format='red-green', matches=[]):
     if colour_format == 'unique':

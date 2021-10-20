@@ -1,6 +1,7 @@
 import json
 import copy
 import os
+import csv
 import numpy as np
 
 
@@ -66,8 +67,17 @@ if __name__ == "__main__":
     elevations = np.array(elevations)
     visibilities = np.array(visibilities)
 
+    header_list = ['Distance', 'Elevation', 'Visibility']
+
     stat_file = anns_dir + "stats.csv"
     with open(stat_file, "w") as file:
-        np.savetxt(file, [distances, elevations, visibilities], delimiter=",")
+        writer = csv.DictWriter(file, fieldnames=header_list)
+        writer.writeheader()
+        for i in range(len(distances)):
+            writer.writerow({
+                'Distance': distances[i],
+                'Elevation': elevations[i],
+                'Visibility': visibilities[i]
+            })
 
     print(visible_objects)
