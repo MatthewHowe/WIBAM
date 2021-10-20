@@ -5,9 +5,11 @@ WIBAM: Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Ba
 Matthew Howe, Ian Reid, Jamie Mackenzie
 In: Britich Machine Vision Conference (BMVC) 2021
 ```
-The full paper is available [here]()
+The full paper is available [here]().
 
+3D object detector trained on NuScenes only.
 ![3D object detector trained on NuScenes only](examples/baseline.gif)
+3D object detector finetuned on the WIBAM dataset.
 ![3D object detector finetuned on the WIBAM dataset](examples/WIBAM.gif)
 
 Accurate 7DoF prediction of vehicles at an intersection is an important task for assessing potential conflicts between road users. In principle, this could be achieved by a single camera system that is capable of detecting the pose of each vehicle but this would require a large, accurately labelled dataset from which to train the detector. Although large vehicle pose datasets exist (ostensibly developed for autonomous vehicles), we find training on these datasets inadequate. These datasets contain images from a ground level viewpoint, whereas an ideal view for intersection observation would be elevated higher above the road surface. 
@@ -16,8 +18,7 @@ To fine-tune the monocular 3D object detector, our method utilises multiple 2D d
 Our method achieves vehicle 7DoF pose prediction accuracy on our dataset comparable to the top performing monocular 3D object detectors on autonomous vehicle datasets. We present our training methodology, multi-view reprojection loss, and dataset.
 
 ## Required hardware
-
-
+Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 4 Nvidia V100s. (80GB VRAM required).
 
 ## Installation and setup
 
@@ -69,8 +70,8 @@ cd src/lib/model/networks/DCNv2/ && ./make.sh && cd ../../../../../
 ```
 
 Run training code
-``
-`python src/main_lit.py ddd --trainset_percentage=1.0 --output_path=gs://aiml-reid-casr-data/lightning_experiments --load_model=models/nuScenes_3Ddetection_e140.pth --dataset=wibam --batch_size=128 --lr=7.8125e-6 --num_workers=10 --gpus=0,1,2,3
+```
+python src/main_lit.py ddd --trainset_percentage=1.0 --output_path= --load_model=models/nuScenes_3Ddetection_e140.pth --dataset=wibam --batch_size=128 --lr=7.8125e-6 --num_workers=10 --gpus=0,1,2,3
 ```
 
 ## Acknowledgements
