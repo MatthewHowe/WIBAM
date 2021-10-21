@@ -32,64 +32,16 @@ To fine-tune the monocular 3D object detector, our method utilises multiple 2D d
 Our method achieves vehicle 7DoF pose prediction accuracy on our dataset comparable to the top performing monocular 3D object detectors on autonomous vehicle datasets. We present our training methodology, multi-view reprojection loss, and dataset.
 
 ### Additional information about my thesis
+Link to ARSC [video]()
 
-## Required hardware
+## Replicate my results
+Please see the [how to run](readme/GETTING_STARTED.md) section.
 Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
 
-## How to run
-
-Use the dockerfile to set up the environment for training and experimentation.
-```
-docker build Dockerfile
-```
-
-Clone the repository
-```
-git clone https://github.com/MatthewHowe/WIBAM.git
-cd WIBAM
-```
-
-Create a data directory
-```
-mkdir data
-```
-
-Download the [WIBAM dataset]() and organise the directory as follows.
-```
-WIBAM
-│   README.md
-│   requirements.txt    
-│   ...
-|
-└───data
-│   └───wibam
-|       └───calib
-│       └───annotations
-│       └───frames
-│       └───image_sets
-|       └───models
-│   
-└───src
-    └───lib
-    └───tools
-    |   ...
-```
-
-Install the requirements
-```
-pip install requirements.txt
-```
-
-Build DCNv2
-```
-cd src/lib/model/networks/DCNv2/
-./make.sh
-```
-
-From the main WIBAM directory run training code
-```
-python src/main_lit.py ddd --trainset_percentage=1.0 --output_path= --load_model=models/nuScenes_3Ddetection_e140.pth --dataset=wibam --batch_size=128 --lr=7.8125e-6 --num_workers=10 --gpus=0,1,2,3
-```
+## Bold numbers for you
+**4**
+**29**
+**40**
 
 ## Citation   
 ```
