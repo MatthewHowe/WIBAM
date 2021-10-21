@@ -1,11 +1,5 @@
-## Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
-This is the project code for WIBAM as presented in our paper:
-```
-WIBAM: Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
-Matthew Howe, Ian Reid, Jamie Mackenzie
-In: Britich Machine Vision Conference (BMVC) 2021
-```
-The full paper is available [here]().
+# WIBAM 
+### Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
 
 3D object detector trained on NuScenes only.
 
@@ -14,6 +8,16 @@ The full paper is available [here]().
 3D object detector finetuned on the WIBAM dataset.
 
 ![3D object detector finetuned on the WIBAM dataset](examples/WIBAM.gif)
+
+This is the project code for WIBAM as presented in our paper:
+```
+WIBAM: Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
+Matthew Howe, Ian Reid, Jamie Mackenzie
+In: Britich Machine Vision Conference (BMVC) 2021
+```
+The full paper is available [here]().
+
+
 
 Accurate 7DoF prediction of vehicles at an intersection is an important task for assessing potential conflicts between road users. In principle, this could be achieved by a single camera system that is capable of detecting the pose of each vehicle but this would require a large, accurately labelled dataset from which to train the detector. Although large vehicle pose datasets exist (ostensibly developed for autonomous vehicles), we find training on these datasets inadequate. These datasets contain images from a ground level viewpoint, whereas an ideal view for intersection observation would be elevated higher above the road surface. 
 We develop an alternative approach using a weakly supervised method of fine tuning 3D object detectors for traffic observation cameras; showing in the process that large existing autonomous vehicle datasets can be leveraged for pre-training. 
