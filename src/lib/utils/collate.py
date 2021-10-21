@@ -1,10 +1,11 @@
 # Custom torch dataset collation with default torch collator
 
-import torch
 import numpy as np
+import torch
+from torch._six import container_abcs, int_classes, string_classes
 import torch.utils.data
-from torch._six import container_abcs, string_classes, int_classes
-from torch.utils.data._utils.collate import default_collate 
+from torch.utils.data._utils.collate import default_collate
+
 
 def instance_batching_collate(batch):
     r"""Puts each data field into a tensor with outer dimension batch size"""
@@ -20,9 +21,12 @@ def instance_batching_collate(batch):
             storage = elem.storage()._new_shared(numel)
             out = elem.new(storage)
         return torch.stack(batch, 0, out=out)
-    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
-            and elem_type.__name__ != 'string_':
-        if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+    elif (
+        elem_type.__module__ == "numpy"
+        and elem_type.__name__ != "str_"
+        and elem_type.__name__ != "string_"
+    ):
+        if elem_type.__name__ == "ndarray" or elem_type.__name__ == "memmap":
             # array of string classes and object
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
                 raise TypeError(default_collate_err_msg_format.format(elem.dtype))
@@ -45,18 +49,18 @@ def instance_batching_collate(batch):
                 for sample in d[key]:
                     samples.append(default_collate(sample))
             batch_dict[key] = torch.stack(samples)
-                # batch_dict[key] = default_collate(d[key])
+            # batch_dict[key] = default_collate(d[key])
         return batch_dict
         # batch_dict = {key: default_collate(default_collate(sample for sample in d[key]) for d in batch) for key in elem}
 
-    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+    elif isinstance(elem, tuple) and hasattr(elem, "_fields"):  # namedtuple
         return elem_type(*(default_collate(samples) for samples in zip(*batch)))
     elif isinstance(elem, container_abcs.Sequence):
         # check to make sure that the elements in batch have consistent size
         it = iter(batch)
         elem_size = len(next(it))
         if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError('each element in list of batch should be of equal size')
+            raise RuntimeError("each element in list of batch should be of equal size")
         transposed = zip(*batch)
         return [default_collate(samples) for samples in transposed]
 

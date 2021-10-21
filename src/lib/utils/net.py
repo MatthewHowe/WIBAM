@@ -1,33 +1,32 @@
-import os
-
-from typing import List, Optional
-from pathlib import Path
-import gswrap
 import datetime
-import time
 import logging
+import os
+from pathlib import Path
+import time
+from typing import List, Optional
+
 from dateutil.tz import tzlocal
-
 from google.api_core.exceptions import ServerError
-
+import gswrap
 from requests.exceptions import (
-    ReadTimeout,
-    ConnectTimeout,
-    ConnectionError,
-    TooManyRedirects,
-    InvalidURL,
     ChunkedEncodingError,
+    ConnectionError,
+    ConnectTimeout,
     ContentDecodingError,
-    SSLError,
-    ProxyError,
     HTTPError,
+    InvalidURL,
     MissingSchema,
+    ProxyError,
+    ReadTimeout,
     RetryError,
+    SSLError,
+    TooManyRedirects,
 )
 
 client = gswrap.Client()
 
 logger = logging.getLogger("gcs-sync")
+
 
 def get_modified_date_or_none_gcs(url: str) -> Optional[datetime.datetime]:
     """
