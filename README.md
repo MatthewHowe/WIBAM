@@ -38,18 +38,15 @@ Link to ARSC [video]()
 Please see the [how to run](readme/GETTING_STARTED.md) section.
 Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
 
-## Bold numbers for you
-**4**
-**29**
-**40**
+## Results
 
 ## Citation   
 ```
-@article{YourName,
-  title={Your Title},
-  author={Your team},
-  journal={Location},
-  year={Year}
+@article{WIBAM,
+  title={Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data},
+  author={Matthew Howe, Ian Reid, Jamie Mackenzie},
+  journal={32nd British Machine Vision Conference, BMVC 2021},
+  year={2021}
 }
 ```   
 
