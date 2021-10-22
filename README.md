@@ -1,6 +1,6 @@
 <div align="center">    
 
-# WIBAM 
+# WIBAM (Work in progress)
 ### Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
 <!-- 
 [![Paper]()]()
