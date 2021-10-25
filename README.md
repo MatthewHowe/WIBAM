@@ -32,7 +32,7 @@ To fine-tune the monocular 3D object detector, our method utilises multiple 2D d
 Our method achieves vehicle 7DoF pose prediction accuracy on our dataset comparable to the top performing monocular 3D object detectors on autonomous vehicle datasets. We present our training methodology, multi-view reprojection loss, and dataset.
 
 ### Additional information about my thesis
-Link to ARSC [video]()
+Link to Australian Road Safety Conference 2021 [presentation video](https://youtu.be/Y3vEunWEHMI).
 
 ## Replicate my results
 Please see the [how to run](readme/GETTING_STARTED.md) section.
