@@ -35,8 +35,12 @@ Our method achieves vehicle 7DoF pose prediction accuracy on our dataset compara
 Link to Australian Road Safety Conference 2021 [presentation video](https://youtu.be/Y3vEunWEHMI).
 
 ## Replicate my results
-Please see the [how to run](readme/GETTING_STARTED.md) section.
-Inference can be achieved with a single GPU (~8GB VRAM). Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
+Please see the [replication](readme/REPLICATE.md) section.
+Inference can be achieved with a single GPU (~8GB VRAM). 
+
+## Training the model
+Please see the [how to section](readme/GETTING_STARTED.md)
+Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
 
 ## Results
 
