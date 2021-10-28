@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 
-import _init_paths
+# import _init_paths
 import fsspec
 import torch
 
