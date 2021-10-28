@@ -1,0 +1,5 @@
+*.avi
+lightning_logs
+csv_results
+data
+__pycache__

@@ -1,9 +1,4 @@
 
-Use the dockerfile to set up the environment for training and experimentation.
-```
-docker build Dockerfile
-```
-
 Clone the repository
 ```
 git clone https://github.com/MatthewHowe/WIBAM.git
@@ -42,18 +37,19 @@ WIBAM
     |   ...
 ```
 
-Install the requirements
+Pull the docker image.
 ```
-pip install requirements.txt
+docker pull matthewhowe/wibam
 ```
 
-Build DCNv2
-```
-cd src/lib/model/networks/DCNv2/
-./make.sh
-```
+
 
 From the main WIBAM directory run training code
 ```
 python src/main_lit.py ddd --trainset_percentage=1.0 --output_path= --load_model=models/nuScenes_3Ddetection_e140.pth --dataset=wibam --batch_size=128 --lr=7.8125e-6 --num_workers=10 --gpus=0,1,2,3
+```
+
+From the main WIBAM directory run the test to replicate results
+```
+python src/main_lit.py ddd --dataset=wibam --load_model=data/wibam/models/wibam.ckpt --batch_size=1 --save_video --gpus=0 --num_workers=1 --test_only
 ```

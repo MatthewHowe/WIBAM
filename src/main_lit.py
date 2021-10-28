@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 
-# import _init_paths
+import _init_paths
 import fsspec
 import torch
 
@@ -21,8 +21,8 @@ from opts import opts
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
-from pytorch_lightning.overrides.data_parallel import LightningDistributedDataParallel
-from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
+# from pytorch_lightning.overrides.data_parallel import LightningDistributedDataParallel
+# from pytorch_lightning.plugins.ddp_plugin import DDPPlugin
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, random_split
@@ -32,7 +32,7 @@ from torchvision.datasets import MNIST
 from trainer import GenericLoss, MultiviewLoss
 from utils.collate import default_collate, instance_batching_collate
 from utils.mv_utils import compare_ground_truth, test_post_process
-from utils.net import *
+# from utils.net import *
 from utils.post_process import generic_post_process
 from utils.utils import Profiler, separate_batches
 
@@ -224,7 +224,7 @@ class LitWIBAM(pl.LightningModule):
             "area",
         ]
         self.CSVWriter = csv.DictWriter(
-            open(f"csv_results/{model_name}.csv", "w"), fieldnames=field_names
+            open(os.getcwd() + f"/csv_results/{model_name}.csv", "w+"), fieldnames=field_names
         )
         self.CSVWriter.writeheader()
         if opt.save_video:
@@ -246,6 +246,7 @@ class LitWIBAM(pl.LightningModule):
             out = generic_decode(out, self.opt.K, self.opt)
             # test_batch['meta'] = separate_batches(test_batch['meta'],
             # 									  opt.batch_size)
+            print(f"\n\n{test_batch.keys()}\n\n")
             out = generic_post_process(
                 self.opt,
                 out,
@@ -373,14 +374,14 @@ if __name__ == "__main__":
 
     earlystop_callback = EarlyStopping(monitor="val_tot", min_delta=0.001, patience=10)
 
-    class MyDDP(DDPPlugin):
-        def configure_ddp(self, model, device_ids=opt.gpus):
-            model = LightningDistributedDataParallel(
-                model, device_ids, find_unused_parameters=True
-            )
-            return model
+    # class MyDDP(DDPPlugin):
+    #     def configure_ddp(self, model, device_ids=opt.gpus):
+    #         model = LightningDistributedDataParallel(
+    #             model, device_ids, find_unused_parameters=True
+    #         )
+    #         return model
 
-    my_ddp = MyDDP()
+    # my_ddp = MyDDP()
 
     trainer = pl.Trainer(
         checkpoint_callback=True,
@@ -389,8 +390,10 @@ if __name__ == "__main__":
         gpus=opt.gpus,
         accelerator="dp",
         check_val_every_n_epoch=2,
-        plugins=[my_ddp],
+        plugins=[],
     )
 
-    # trainer.test(model)
-    trainer.fit(model)
+    trainer.test(model)
+    
+    if not opt.test_only:
+        trainer.fit(model)

@@ -44,7 +44,7 @@ RUN curl -sLo ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-late
     rm ~/miniconda.sh
 
 # packages
-RUN conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=11.1 pytorch-lightning \
+RUN conda install pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=11.0 pytorch-lightning \
     numpy pandas matplotlib scikit-learn tqdm jupyter \
     einops flake8-black flake8 isort loguru -c pytorch -c conda-forge 
 
@@ -60,4 +60,4 @@ RUN pip install yacs scikit-image tqdm opencv-python Cython numba progress matpl
 	Cython \
 	gcsfs 
 
-RUN git clone https://github.com/MatthewHowe/DCNv2.git /home/user/DCNv2 && pip install --user --no-cache-dir -e /home/user/DCNv2
+# RUN git clone https://github.com/MatthewHowe/DCNv2.git /home/user/DCNv2 && pip install --user --no-cache-dir -e /home/user/DCNv2

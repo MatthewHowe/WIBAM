@@ -75,7 +75,7 @@ class WIBAM(GenericDataset):
     # Initialisation function
     def __init__(self, opt, split):
         # Define specific locations of dataset files
-        data_dir = os.path.join(opt.data_dir, "wibam_published")
+        data_dir = os.path.join(opt.data_dir, "wibam")
         img_dir = os.path.join(data_dir, "frames")
         # Where instance sets are kept
         split_dir = os.path.join(data_dir, "image_sets")

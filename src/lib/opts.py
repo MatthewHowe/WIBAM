@@ -24,10 +24,11 @@ class opts(object):
         )
         self.parser.add_argument("--exp_id", default="default")
         self.parser.add_argument("--test", action="store_true")
+        self.parser.add_argument("--test_only", action="store_true")
         self.parser.add_argument(
             "--debug",
             type=int,
-            default=0,
+            default=1,
             help="level of visualization."
             "1: only show the final detection results"
             "2: show the network output features"
