@@ -1,4 +1,6 @@
 
+# Run the training code on the WIBAM dataset
+
 Clone the repository
 ```
 git clone https://github.com/MatthewHowe/WIBAM.git
@@ -11,7 +13,6 @@ mkdir data
 ```
 
 Download the [WIBAM dataset](https://zenodo.org/record/5609988#.YXsWkjpBWxs)([alternate link](https://universityofadelaide.box.com/s/73gccpx603i43iod7260lth00m4i3v4h)) and organise the directory as follows.
-The images in the dataset are in individual folders, extract them into the frames directory and rename them 0, 1, 2 and 3. Rename 'wibam_no_frames' to wibam.
 
 ```
 WIBAM
@@ -42,6 +43,10 @@ Pull the docker image.
 docker pull matthewhowe/wibam
 ```
 
+Run the docker image
+```
+make run
+```
 
 
 From the main WIBAM directory run training code

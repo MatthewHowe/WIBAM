@@ -46,3 +46,6 @@ From within the docker image run
 ```
 python src/main_lit.py ddd --dataset=wibam --load_model=data/wibam/models/wibam.ckpt --batch_size=1 --save_video --gpus=0 --num_workers=1 --test_only
 ```
+
+Three videos should output: The input image with predictions + ground truth overlay, a BEV, and the two joint.
+All detections and prediction statistics will be generated under csv_results/{model_name}.csv
