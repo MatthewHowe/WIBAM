@@ -1,6 +1,6 @@
 <div align="center">    
 
-# WIBAM (Work in progress)
+# WIBAM
 ### Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
 <!-- 
 [![Paper]()]()
@@ -41,8 +41,6 @@ Inference can be achieved with a single GPU (~8GB VRAM).
 ## Training the model
 Please see the [how to section](readme/GETTING_STARTED.md)
 Training was done on either two Nvidia 3080s or 2 Nvidia V100s. (min ~40GB VRAM required).
-
-## Results
 
 ## Citation   
 ```
