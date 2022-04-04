@@ -22,7 +22,7 @@ This is the project code for WIBAM as presented in our paper:
 ```
 WIBAM: Weakly Supervised Training of Monocular 3D Object Detectors Using Wide Baseline Multi-view Traffic Camera Data
 Matthew Howe, Ian Reid, Jamie Mackenzie
-In: Britich Machine Vision Conference (BMVC) 2021
+In: British Machine Vision Conference (BMVC) 2021
 ```
 The preprint paper is available [here](https://arxiv.org/abs/2110.10966).
 
